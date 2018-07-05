@@ -3,6 +3,17 @@
 A Kafka Connector which allows to push bitcoin transfers to a kafka topic
 
 
+## Setting up your development environment
+
+### Environment variables
+The build process depends on some parameters which are given to sbt
+using environment variables. To ease development you can use a `.env`
+file. During the build process all variables in the .env file will be
+put in the environment.
+
+After you first clone this repository copy the provided sample file
+`.env.sample` to `.env` and then edit whatever variables are necessary
+
 ## Installing
 
 ???
