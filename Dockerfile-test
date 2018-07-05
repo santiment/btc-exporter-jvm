@@ -1,0 +1,15 @@
+FROM hseeberger/scala-sbt:8u171_2.12.6_1.1.6
+
+WORKDIR /app
+
+COPY project /app/project/
+
+RUN sbt reload
+
+COPY *.sbt .env /app/
+
+RUN env $(grep -v '^#' .env | xargs) sbt reload
+
+COPY ./* /app/
+
+CMD env $(grep -v '^#' .env | xargs) sbt test it:test

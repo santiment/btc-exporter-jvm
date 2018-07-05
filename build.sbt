@@ -4,6 +4,7 @@ enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
 
 lazy val root = (project in file("."))
+  .enablePlugins(BuildInfoPlugin)
   .configs(IntegrationTest)
   .settings(
     Defaults.itSettings,
@@ -21,6 +22,11 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq (
       scalaTest % s"${Test.name},${IntegrationTest.name}",
       jsonrpc,
-      bitcoinj
-    ) ++ logback
+      bitcoinj,
+      zookeeper
+    ) ++ logback ++ curatorLibs,
+
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+
+    buildInfoPackage := organization.value
   )

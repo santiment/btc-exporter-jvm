@@ -9,4 +9,10 @@ package object santiment {
     val password: String
   }
 
+  type ZookeeperCheckpointerConfig = {
+    val namespace: String
+    val path: String
+    val connectionString: String
+  }
+
 }

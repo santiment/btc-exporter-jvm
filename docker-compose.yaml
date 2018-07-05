@@ -1,0 +1,37 @@
+version: '3'
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "127.0.0.1:2181:2181"
+    logging:
+        driver: none
+  kafka:
+    image: wurstmeister/kafka
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    depends_on:
+      - zookeeper
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+        driver: none
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile-test
+    depends_on:
+      - zookeeper
+      
+    environment:
+      KAFKA_URL: kafka:9092
+      ZOOKEEPER_URL: zookeeper:2181
+      START_BLOCK: 52500
+      BITCOIND_URL: bitcoind
+      BITCOIND_PORT: 8332
+      BITCOIND_USER: 
+      BITCOIND_PASSWORD:

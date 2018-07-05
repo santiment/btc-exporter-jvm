@@ -1,12 +1,11 @@
 package net.santiment
 
-import java.net.{URI, URL}
+import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.googlecode.jsonrpc4j.{JsonRpcHttpAsyncClient, JsonRpcHttpClient}
-import com.msgilligan.bitcoinj.{rpc => external}
+import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import org.bitcoinj.core._
 import org.bitcoinj.params.MainNetParams
 
