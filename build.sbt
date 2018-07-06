@@ -24,7 +24,8 @@ lazy val root = (project in file("."))
       scalaLogging,
       jsonrpc,
       bitcoinj,
-      zookeeper
+      zookeeper,
+      kafka
     ) ++ logging ++ curatorLibs,
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),

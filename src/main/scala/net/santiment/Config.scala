@@ -17,6 +17,7 @@ case class ZookeeperCheckpointerConfig
 
 case class KafkaConfig
 (
+  bootstrapServers: String,
   topic: String
 )
 
@@ -36,6 +37,7 @@ object Config extends Config(
   ),
 
   kafka = KafkaConfig(
+    bootstrapServers = sys.env("KAFKA_URL"),
     topic = sys.env("KAFKA_TOPIC")
   ),
 
