@@ -1,20 +1,47 @@
 package net.santiment
 
-object Config {
-  lazy val bitcoind:BitcoinClientConfig = new {
-    val host: String = sys.env.getOrElse("BITCOIND_URL", "localhost")
-    val port: String = sys.env.getOrElse("BITCOIND_PORT", "8332")
-    val username: String = sys.env("BITCOIND_USER")
-    val password: String = sys.env("BITCOIND_PASSWORD")
-  }
+case class BitcoinClientConfig
+(
+  host:String,
+  port:String,
+  username: String,
+  password: String
+)
 
-  lazy val blockCheckpointConfig: ZookeeperCheckpointerConfig = new {
-    val namespace: String = s"/${BuildInfo.name}"
-    val path: String = s"/${Config.kafkaConfig.topic}/block-number"
-    val connectionString: String = sys.env.getOrElse("ZOOKEEPER_URL", "localhost:2181")
-  }
+case class ZookeeperCheckpointerConfig
+(
+  connectionString: String,
+  namespace: String,
+  path: String
+)
 
-  lazy val kafkaConfig = new {
-    val topic:String = sys.env("KAFKA_TOPIC")
-  }
-}
+case class KafkaConfig
+(
+  topic: String
+)
+
+case class Config
+(
+  bitcoind: BitcoinClientConfig,
+  blockCheckpointer: ZookeeperCheckpointerConfig,
+  kafka: KafkaConfig
+)
+
+object Config extends Config(
+  bitcoind = BitcoinClientConfig(
+    host = sys.env.getOrElse("BITCOIND_URL", "localhost"),
+    port = sys.env.getOrElse("BITCOIND_PORT", "8332"),
+    username = sys.env("BITCOIND_USER"),
+    password = sys.env("BITCOIND_PASSWORD")
+  ),
+
+  kafka = KafkaConfig(
+    topic = sys.env("KAFKA_TOPIC")
+  ),
+
+  blockCheckpointer = ZookeeperCheckpointerConfig(
+    connectionString = sys.env.getOrElse("ZOOKEEPER_URL", "localhost:2181"),
+    namespace = s"${BuildInfo.name}",
+    path = s"/${sys.env("KAFKA_TOPIC")}/block-number"
+  )
+)

@@ -4,12 +4,14 @@ WORKDIR /app
 
 COPY project /app/project/
 
-RUN sbt reload
-
 COPY *.sbt .env /app/
 
-RUN env $(grep -v '^#' .env | xargs) sbt reload
+RUN env $(grep -v '^#' .env | xargs) sbt update
 
-COPY ./* /app/
+#COPY . /app/
 
-CMD env $(grep -v '^#' .env | xargs) sbt test it:test
+#RUN env $(grep -v '^#' .env | xargs) sbt update
+
+
+CMD env $(grep -v '^#' .env | xargs) sbt '~test' &\
+    env $(grep -v '^#' .env | xargs) sbt '~it:test' && fg

@@ -4,8 +4,8 @@ services:
     image: wurstmeister/zookeeper
     ports:
       - "127.0.0.1:2181:2181"
-    logging:
-        driver: none
+    #logging:
+    #    driver: none
   kafka:
     image: wurstmeister/kafka
     ports:
@@ -15,17 +15,24 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     depends_on:
       - zookeeper
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    logging:
-        driver: none
+    #volumes:
+    #  - /var/run/docker.sock:/var/run/docker.sock
+    #logging:
+    #    driver: none
 
-  test:
+  sbt:
     build:
       context: .
       dockerfile: Dockerfile-test
+
+    volumes:
+      - .:/app
+
     depends_on:
       - zookeeper
+      - kafka
+
+    command: ["sbt"]
       
     environment:
       KAFKA_URL: kafka:9092

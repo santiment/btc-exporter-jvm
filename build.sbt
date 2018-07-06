@@ -21,10 +21,11 @@ lazy val root = (project in file("."))
 
     libraryDependencies ++= Seq (
       scalaTest % s"${Test.name},${IntegrationTest.name}",
+      scalaLogging,
       jsonrpc,
       bitcoinj,
       zookeeper
-    ) ++ logback ++ curatorLibs,
+    ) ++ logging ++ curatorLibs,
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 
