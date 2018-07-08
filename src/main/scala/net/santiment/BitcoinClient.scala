@@ -12,21 +12,7 @@ import org.bitcoinj.params.MainNetParams
 import collection.JavaConverters._
 
 
-class BitcoinClient(config: BitcoinClientConfig) {
-
-  val url:URL = new URL(s"http://${config.host}:${config.port}")
-  val authString = s"${config.username}:${config.password}"
-
-  val encodedAuthString: String = Base64
-    .getEncoder
-    .encodeToString(
-      authString
-        .getBytes(StandardCharsets.UTF_8)
-    )
-
-  val headers: Map[String, String] = Map[String,String](("Authorization",s"Basic $encodedAuthString"))
-
-  val mapper = new ObjectMapper()
+class BitcoinClient(private val client:JsonRpcHttpClient) {
 
   val networkParameters: NetworkParameters = MainNetParams.get()
 
@@ -35,10 +21,6 @@ class BitcoinClient(config: BitcoinClientConfig) {
   val context = new Context(networkParameters)
 
   val serializer = new BitcoinSerializer(networkParameters,false)
-
-  lazy val client = new JsonRpcHttpClient(mapper, url, headers.asJava)
-
-  //lazy val client = new external.BitcoinClient(networkParameters, uri, config.username, config.password)
 
   def getBlockHash(height:Integer):Sha256Hash = {
     client.invoke("getblockhash",Array(height),classOf[Sha256Hash])
@@ -57,6 +39,10 @@ class BitcoinClient(config: BitcoinClientConfig) {
     )
 
     serializer.makeTransaction(serialized)
+  }
+
+  def blockCount:Int = {
+    client.invoke("getblockcount", Array(), classOf[Int])
   }
 
 }
