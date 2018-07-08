@@ -14,6 +14,14 @@ To start the development environment:
 
 1) Copy `.env.sample` to `.env` and edit the variables `BITCOIND_*`.
 
+2) Build the sbt container:
+
+``` sh
+export UID
+export GID
+docker-compose build sbt
+```
+
 2) Run sbt using docker-compose:
 
 ``` sh

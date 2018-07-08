@@ -24,6 +24,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-test
+      args:
+        - UID
+        - GID
 
     volumes:
       - .:/app
