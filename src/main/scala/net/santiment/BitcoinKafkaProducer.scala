@@ -2,6 +2,11 @@ package net.santiment
 
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.kafka.common.KafkaException
+import org.bitcoinj.core.{Sha256Hash, Transaction}
+import org.bitcoinj.core.TransactionInput.{ConnectMode, ConnectionResult}
+
+import collection.JavaConverters._
+import scala.collection.mutable
 
 class BitcoinKafkaProducer
 (
@@ -18,6 +23,43 @@ class BitcoinKafkaProducer
 
   def processBlock(height: Int): Unit = {
     val block = world.bitcoin.getBlock(height)
+
+    val txs = block.getTransactions
+    val inputHashes = mutable.HashSet[Sha256Hash]()
+
+    // Gather all input transactions that need to be retrieved
+    txs.asScala.foreach { tx =>
+
+      //Ignore coinbase txs
+      //TODO: We shouldn't ignore them
+      if(tx.isCoinBase) {
+        return
+      }
+
+      tx.getInputs.forEach { input =>
+        val hash = input.getParentTransaction.getHash
+        inputHashes.add(hash)
+      }
+    }
+
+    //Get all parent transactions
+    val parents:collection.Map[Sha256Hash,Transaction] = world.bitcoin.getTxList(inputHashes)
+
+    txs.asScala.foreach { tx =>
+
+      //Connect input to parents
+      tx.getInputs.forEach { input =>
+        val result = input.connect(parents.asJava,ConnectMode.DISCONNECT_ON_CONFLICT)
+        if (result != ConnectionResult.SUCCESS) {
+          logger.error(s"Cannot connect tx for input ${input.getSequenceNumber} from tx ${tx.getHashAsString}")
+          throw new IllegalStateException()
+        }
+      }
+
+      //
+    }
+
+
   }
 
   def makeTxProcessor(lastBlock:TransactionalStore[Integer], sink:TransactionalSink, processor:Int=>Unit)(height:Int): Unit = {
@@ -60,7 +102,7 @@ class BitcoinKafkaProducer
   lazy val txProcess: Int => Unit = makeTxProcessor(world.lastBlockStore, world.sink, processBlock)
 
   /**
-   * Main loop
+   * Main function. Should be called from a cron job which runs once every 10 minutes
    */
 
   def main(args: Array[String]): Unit = {
@@ -70,15 +112,13 @@ class BitcoinKafkaProducer
         .map(_.intValue)
         .getOrElse(0)
 
-      while (true) {
-        //Fetch blocks
-        val lastToBeWritten = world.bitcoin.blockCount - world.config.confirmations
+      //Fetch blocks until present
+      val lastToBeWritten = world.bitcoin.blockCount - world.config.confirmations
 
-        for (height <- (lastWritten + 1) to lastToBeWritten) {
-          txProcess(height)
-        }
-        Thread.sleep(world.config.sleepBetweenRunsMs)
+      for (height <- (lastWritten + 1) to lastToBeWritten) {
+        txProcess(height)
       }
+
     } catch {
       case e:Exception =>
         logger.error("Unhandled exeption", e)

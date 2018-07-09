@@ -3,6 +3,7 @@ package net.santiment
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.Base64
+import java.util.concurrent.TimeUnit
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
@@ -10,6 +11,10 @@ import org.bitcoinj.core._
 import org.bitcoinj.params.MainNetParams
 
 import collection.JavaConverters._
+import scala.collection.mutable
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 class BitcoinClient(private val client:JsonRpcHttpClient) {
@@ -39,6 +44,21 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
     )
 
     serializer.makeTransaction(serialized)
+  }
+
+  /**
+    * Returns the transactions corresponding to a list of hashes. Can be implemented using batching JSON calls in theory.
+    * @param hashes - the list of hashes
+    * @return - a map of transactions
+    */
+  def getTxList(hashes:collection.Set[Sha256Hash]):collection.Map[Sha256Hash, Transaction] = {
+    val futures = hashes.map {
+      hash => Future {
+        (hash, getTx(hash))
+      }
+    }
+
+    Await.result(Future.sequence(futures), Duration.create(30, TimeUnit.SECONDS)).toMap[Sha256Hash, Transaction]
   }
 
   def blockCount:Int = {
