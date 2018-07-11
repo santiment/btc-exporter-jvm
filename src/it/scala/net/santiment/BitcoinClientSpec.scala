@@ -1,11 +1,15 @@
 package net.santiment
 
-import org.bitcoinj.core.Sha256Hash
+import org.bitcoinj.core.{Sha256Hash, Utils}
 import org.scalatest.FunSuite
-
 import Globals._
+import com.typesafe.scalalogging.LazyLogging
+import org.bitcoinj.script.{Script, ScriptBuilder}
 
-class BitcoinClientSpec extends FunSuite {
+/**
+  * Integration tests for BitcoinClient
+  */
+class BitcoinClientSpec extends FunSuite with LazyLogging {
 
   test("getBlockHash should work") {
     val hash = bitcoin.getBlockHash(500000)
@@ -25,4 +29,13 @@ class BitcoinClientSpec extends FunSuite {
   test("blockCount should work") {
     assert(bitcoin.blockCount > 10000)
   }
+
+  test("getTxList should work") {
+    val tx1 = Sha256Hash.wrap("2157b554dcfda405233906e461ee593875ae4b1b97615872db6a25130ecc1dd6")
+    val tx2 = Sha256Hash.wrap("0aa3d7cbbd35484632645675f5a6f28440a604975ce254c5701e4602f7d8dcc6")
+    val result = bitcoin.getTxList(Set(tx1,tx2))
+    assert(result(tx1).getInput(0).getSequenceNumber == 4294967295L)
+    assert(result(tx2).getInput(0).getSequenceNumber == 4294967294L)
+  }
+
 }
