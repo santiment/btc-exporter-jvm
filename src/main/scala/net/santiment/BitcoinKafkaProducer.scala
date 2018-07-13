@@ -41,63 +41,52 @@ class BitcoinKafkaProducer
       amounts.put(te.account, old+value)
     }
 
+    logger.trace(s"amounts=$amounts")
+
     //2.Order debits and credits by amount and match them greedily
-    val buffer = amounts.toBuffer.filter(_._2 != 0).sortBy((x:(BitcoinAddress,Long))=>x._2)
-    logger.trace(s"buffer=${buffer.map(_.toString())}")
+    case class Entry(account:BitcoinAddress, var value:Long)
+
+    val debits2 = mutable.PriorityQueue[Entry]()(Ordering.by(_.value))
+    val credits2 = mutable.PriorityQueue[Entry]()(Ordering.by(0L-_.value))
+    var total = 0L
+
+    for ( (address,value) <- amounts ) {
+      if(value>0L) {
+        debits2.enqueue(Entry(address,value))
+        total += value
+      } else if (value<0L) {
+        credits2.enqueue(Entry(address,value))
+      }
+    }
+
+    var curDebit:Entry = Entry(null,0L)
+    var curCredit:Entry = Entry(null,0L)
     var result = new j.LinkedList[(BitcoinAddress,BitcoinAddress,Coin)]()
-    var start = 0
-    var remainder = buffer.head._2
-    var end = buffer.length
-    var creditValue = 0L
-    var debitValue = 0L
-    var comp = 0L
 
-    while(end-start > 1) {
-      logger.trace(s"loop start=$start, end=$end, remainder=$remainder, result=${result.asScala}")
-      var transferValue: Long = 0L
-
-      if (remainder < 0L) {
-
-        end -= 1
-        debitValue = buffer(end)._2
-
-        comp = remainder + debitValue
-
-        if (comp > 0L) {
-          transferValue = -remainder
-          remainder = remainder + debitValue
-        } else {
-          transferValue = debitValue
-          remainder = comp
-        }
-      } else {
-
-        start += 1
-
-        creditValue = buffer(start)._2
-
-        comp = remainder + creditValue
-
-        if (comp > 0) {
-          transferValue = -creditValue
-          remainder = comp
-        } else {
-          transferValue = remainder
-          remainder = comp
-        }
+    while (total > 0L) {
+      logger.trace(s"loop $curDebit, $curCredit, $total")
+      if(curDebit.value == 0L) {
+        curDebit = debits2.dequeue()
       }
-      logger.trace(s"loop end start=$start, end=$end, remainder=$remainder, comp=$comp, tV=$transferValue")
-      if (transferValue != 0L) {
-        result.add( (buffer(start)._1,
-          buffer(end)._1,
-          Coin.valueOf(transferValue)))
+      if(curCredit.value == 0L) {
+        curCredit = credits2.dequeue()
       }
+
+      val transferValue = Math.min(curDebit.value,-curCredit.value)
+      curDebit.value -= transferValue
+      curCredit.value += transferValue
+      result.add( (curCredit.account,
+        curDebit.account,
+        Coin.valueOf(transferValue)))
+
+      total -= transferValue
+
     }
 
     result
   }
 
-  def processBlock(height: Int): Unit = {
+  def processBlock(height: Int): Int = {
     logger.debug(s"current_block=$height, begin_process")
     val block = world.bitcoin.getBlock(height)
 
@@ -136,7 +125,6 @@ class BitcoinKafkaProducer
         TransactionEntry(account,value)
       }
 
-
       //Connect input to parents and return input list
       val credits = for(input:TransactionInput <- tx.getInputs.asScala) yield {
 
@@ -155,7 +143,7 @@ class BitcoinKafkaProducer
 
       //Compute fees. The fee for each non-coinbase tx is equal to the difference between the debits and the credits
       val totalCredit = credits.map(_.value.getValue).sum //This value is negative
-      val totalDebit = credits.map(_.value.getValue).sum
+      val totalDebit = debits.map(_.value.getValue).sum
       val fee = 0-(totalDebit + totalCredit)
       if(fee < 0) {
         throw new IllegalStateException("credit < debit")
@@ -212,16 +200,17 @@ class BitcoinKafkaProducer
 
     logger.debug(s"block_transactions=${txs.size()}, produced_events=$pushedEvents")
 
+    txs.size()
   }
 
-  def makeTxProcessor(lastBlock:TransactionalStore[Integer], sink:TransactionalSink[ResultTx], processor:Int=>Unit)(height:Int): Unit = {
+  def makeTxProcessor(lastBlock:TransactionalStore[Integer], sink:TransactionalSink[ResultTx], processor:Int=>Int)(height:Int): Int = {
     //Start a new transaction
     sink.begin()
     logger.trace(s"current_block=$height, begin_transaction")
     lastBlock.begin()
 
     //Process the current block and send the resulting records to Kafka
-    processor(height)
+    val result = processor(height)
     sink.flush()
 
     /**
@@ -250,10 +239,10 @@ class BitcoinKafkaProducer
 
     //Inform zk that the transaction has been committed successfully. Here the critical section ends
     lastBlock.commit()
-
+    result
   }
 
-  lazy val txProcess: Int => Unit = makeTxProcessor(world.lastBlockStore, world.sink, processBlock)
+  lazy val txProcess: Int => Int = makeTxProcessor(world.lastBlockStore, world.sink, processBlock)
 
   /**
    * Main function. Should be called from a cron job which runs once every 10 minutes
@@ -277,9 +266,20 @@ class BitcoinKafkaProducer
       val lastToBeWritten = world.bitcoin.blockCount - world.config.confirmations
       logger.info(s"first_block_to_fetch=${lastWritten+1}, last_block_to_fetch=$lastToBeWritten")
 
+      var startTs = System.currentTimeMillis()
+      var blocks = 0
+      var txs = 0
       for (height <- (lastWritten + 1) to lastToBeWritten) {
         logger.debug(s"current_block=$height")
-        txProcess(height)
+        txs += txProcess(height)
+        blocks += 1
+        var test = System.currentTimeMillis()
+        if (test - startTs > 10000) {
+          logger.info(s"blocks=$blocks, txs=$txs, interval=${(test-startTs)/1000}s, last_block=$height")
+          startTs = test
+          blocks = 0
+          txs = 0
+        }
       }
 
     } catch {
