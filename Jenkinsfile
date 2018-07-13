@@ -3,7 +3,7 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
     envVar(key: 'DOCKER_HOST', value: 'tcp://docker-host-docker-host:2375')
   ])
 ]) {
-  node('etherbi-flink-builder') {
+  node('btc-exporter-buildero') {
     stage('Build') {
       container('8-jdk') {
         def scmVars = checkout scm
