@@ -26,7 +26,9 @@ lazy val root = (project in file("."))
       bitcoinj,
       zookeeper,
       kafka
-    ) ++ logging ++ curatorLibs,
+    ) ++ logging ++ curatorLibs ++ jackson,
+
+    scalacOptions += "-Ypartial-unification", //For the cats library
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 

@@ -16,24 +16,11 @@ trait Store[T <: java.io.Serializable] {
   def write(value:Option[T]): Option[T] = {
     val old = read
 
-    if(old.isEmpty && value.isEmpty) {
-      return old
-    }
+    if(old.isDefined && value.isEmpty) delete()
 
-    if(old.isDefined && value.isEmpty) {
-      delete()
-      return old
-    }
+    else if(old.isEmpty && value.isDefined) create(value.get)
 
-    if(old.isEmpty && value.isDefined) {
-      create(value.get)
-      return old
-    }
-
-    if(old.isDefined && value.isDefined) {
-      update(value.get)
-      return old
-    }
+    else if(old.isDefined && value.isDefined) update(value.get)
 
     old
   }

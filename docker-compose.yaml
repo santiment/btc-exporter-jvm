@@ -20,6 +20,19 @@ services:
     #logging:
     #    driver: none
 
+  consumer:
+    image: wurstmeister/kafka:2.11-1.0.1
+    depends_on:
+      - zookeeper
+      - kafka
+    command:
+      - kafka-console-consumer.sh
+      - --bootstrap-server
+      - kafka:9092
+      - --topic
+      - btc-transfers
+      - --from-beginning
+
   sbt:
     build:
       context: .
@@ -45,3 +58,7 @@ services:
       BITCOIND_PORT: 8332
       BITCOIND_USER: 
       BITCOIND_PASSWORD:
+      KAFKA_TOPIC: btc-transfers
+
+volumes:
+  kafka_data:

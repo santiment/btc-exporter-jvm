@@ -59,8 +59,8 @@ class Globals extends LazyLogging
   lazy val lastCommittedHeightStore: Store[Integer] = new ZookeeperStore[Integer](zk, config.zkLastComittedPath)
   lazy val lastBlockStore: TransactionalStore[Integer] = new SimpleTxStore[Integer](lastWrittenHeightStore, lastCommittedHeightStore)
 
-  lazy val producer:KafkaProducer[String, String] = makeKafkaProducer(config.kafka)
-  lazy val sink:TransactionalSink = new KafkaSink(producer)
+  lazy val producer:KafkaProducer[String, Array[Byte]] = makeKafkaProducer(config.kafka)
+  lazy val sink:TransactionalSink[ResultTx] = new KafkaSink[ResultTx](producer, config.kafkaTopic)
 
   lazy val bitcoindJsonRpcClient: JsonRpcHttpClient = makeBitcoindJsonRpcClient(config.bitcoind)
 
@@ -118,12 +118,13 @@ class Globals extends LazyLogging
       new KafkaConsumer[String, String](props)
     }
 
-  def makeKafkaProducer(config:KafkaConfig):KafkaProducer[String, String] = {
+  def makeKafkaProducer(config:KafkaConfig):KafkaProducer[String, Array[Byte]] = {
 
     val properties = new Properties()
     properties.put("bootstrap.servers", config.bootstrapServers)
     properties.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-    properties.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+    properties.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
+
 
     // Wait until the value has been fully written to all kafka servers before acknowledgement
     properties.put("acks", "all")
@@ -142,16 +143,11 @@ class Globals extends LazyLogging
     //This should be unique for each exporter instance which is running. However we plan to run only a single instance.
     properties.put("transactional.id", BuildInfo.name)
 
-    lazy val client: KafkaProducer[String, String] = {
-      val result = new KafkaProducer[String, String](properties)
-      result.initTransactions()
-      logger.info(s"Connected to Kafka at ${config.bootstrapServers}")
-      result
-    }
-
+    val client: KafkaProducer[String, Array[Byte]] = new KafkaProducer[String, Array[Byte]](properties)
     client.initTransactions()
-    client
+    logger.info(s"Connected to Kafka at ${config.bootstrapServers}")
 
+    client
   }
 
   /**
@@ -161,11 +157,7 @@ class Globals extends LazyLogging
     try {
       zk.close()
     } finally {
-      try {
-        producer.close()
-      } finally {
-        return
-      }
+      producer.close()
     }
   }
 

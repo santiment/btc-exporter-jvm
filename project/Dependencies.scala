@@ -39,4 +39,9 @@ object Dependencies {
 
   lazy val logging = logback ++ Seq(scalaLogging)
 
+  lazy val jackson = Seq(
+    "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6"
+  )
+
 }

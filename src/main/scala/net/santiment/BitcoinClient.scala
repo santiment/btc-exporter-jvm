@@ -1,22 +1,16 @@
 package net.santiment
 
-import java.net.URL
-import java.nio.charset.StandardCharsets
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
 import org.bitcoinj.core._
 import org.bitcoinj.params.MainNetParams
 import org.bitcoinj.script.Script
 
-import collection.JavaConverters._
-import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 
 class BitcoinClient(private val client:JsonRpcHttpClient) {
@@ -58,11 +52,10 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
   def blockCount:Int = {
     client.invoke("getblockcount", Array(), classOf[Int])
   }
-
-
 }
 
 case class BitcoinAddress(address:String, kind:String)
+
 
 object BitcoinClient extends LazyLogging {
 
@@ -74,85 +67,56 @@ object BitcoinClient extends LazyLogging {
 
   val serializer = new BitcoinSerializer(mainNetParams,false)
 
-  def extractAddress(scriptPubKey:Script):BitcoinAddress = {
+  /**
+    * Copied from the master branch of bitcoinj. Unfortunately it is not released yet
+    */
+
+  def extractAddress(scriptPubKey:Script):BitcoinAddress = scriptPubKey match {
 
     //1. P2PKH
-    if( scriptPubKey.isSentToAddress) {
-      val address = scriptPubKey.getToAddress(mainNetParams)
-      return BitcoinAddress(address.toBase58,"P2PKH")
-    }
+    case script if ScriptPattern.isPayToPubKeyHash(script) =>
+      val address = script.getToAddress(mainNetParams)
+      BitcoinAddress(address.toBase58,"P2PKH")
 
     //2. P2PK (We still convert to newform addresses
-    if(scriptPubKey.isSentToRawPubKey) {
-      val address = scriptPubKey.getToAddress(mainNetParams, true)
-      return BitcoinAddress(address.toBase58, "P2PK")
-    }
+    case script if ScriptPattern.isPayToPubKey(script) =>
+      val address = script.getToAddress(mainNetParams, true)
+      BitcoinAddress(address.toBase58, "P2PK")
+
 
     //3. P2SH
-    if(scriptPubKey.isPayToScriptHash) {
-      val address = scriptPubKey.getToAddress(mainNetParams)
-      return BitcoinAddress(address.toBase58, "P2SH")
-    }
-
-    /** 4. Witness address. The witness scriptPubKey has the following format:
-      * `witness_version payload`
-      *
-      * where:
-      * - `witness_version` is 1 byte between 0 and 16. Only existing current version is 1
-      * - `payload` is between 2 and 40 bytes. Right now only lengths 20 and 32 are supported
-      *
-      * For more info see BIP141
-      */
-
-    val program = scriptPubKey.getProgram
-    def isSegWit(program:Array[Byte]):Boolean = {
-        program(0) <= 0x10 &&
-          program(1) >= 0x02 &&
-          program(1) <= 0x28 &&
-          program.length == 2+program(1)
-    }
-
-    def isP2WKH(program:Array[Byte]): Boolean =
-      program(0) == 0 &&
-        program(1) == 0x14
-
-    def isP2WSH(program:Array[Byte]): Boolean =
-      program(0) == 0 &&
-        program(1) == 0x20
-
-    /**
-      * The segwit output scripts can be represented as *Bech32 addresses*
-      *
-      * Their format is described in BIP173
-      */
+    case script if ScriptPattern.isPayToScriptHash(script) =>
+      val address = script.getToAddress(mainNetParams)
+      BitcoinAddress(address.toBase58, "P2SH")
 
 
-    if(isSegWit(program)) {
-
+    //4. P2W
+    case script if ScriptPattern.isPayToWitnessHash(script) =>
       // The bech32 encoding is copied from the master branch of bitcoinj
       // Unfortunately it's not released yet
+      val program = script.getProgram
       val data = Bech32.convertBits(program,2,program.length-2,8,5,true)
       //Add the witness version (0) to the head of the array
       val fullData = new Array[Byte](1+data.length)
       System.arraycopy(data,0,fullData,1,data.length)
       fullData(0)=0 //The current witness version
       val addr = Bech32.encode("bc",fullData)
-            //4.1 P2WKH
-      if(isP2WKH(program)) {
-        return BitcoinAddress(addr, "P2WKH")
-      }
 
-      //4.2 P2SKH
-      if(isP2WSH(program)) {
-        return BitcoinAddress(addr, "P2WSH")
-      }
+      //4.1 P2WPKH
+      if(ScriptPattern.isPayToWitnessPubKeyHash(script)) BitcoinAddress(addr, "P2WPKH")
 
-      throw new ScriptException(s"Unknown witness script ${scriptPubKey.toString}")
-    }
+      //4.2 P2WSH
+      else if(ScriptPattern.isPayToWitnessScriptHash(script)) BitcoinAddress(addr, "P2WSH")
+
+      else throw new ScriptException(s"Unknown witness script $script")
+
+    //5. Null script
+    case script if ScriptPattern.isOpReturn(script) =>
+      BitcoinAddress("","NULL")
 
     //Unsupported address types
-    throw new ScriptException(s"Unknown script ${scriptPubKey.toString}")
-
+    case script =>
+      throw new ScriptException(s"Unknown script ${script.toString}")
   }
 
 

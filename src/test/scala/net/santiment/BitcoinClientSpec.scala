@@ -38,7 +38,7 @@ class BitcoinClientSpec extends FunSuite {
     val script: Script = new Script(Utils.HEX.decode("0014e8df018c7e326cc253faac7e46cdc51e68542c42"))
     val address = BitcoinClient.extractAddress(script)
     assert(address.address == "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")
-    assert(address.kind == "P2WKH")
+    assert(address.kind == "P2WPKH")
   }
 
   test("Testing support for SegWit address, P2WSH") {
