@@ -1,5 +1,5 @@
 podTemplate(label: 'btc-exporter-jvm-builder', containers: [
-  containerTemplate(name: '8-jdk', image: 'openjdk:8-jdk', ttyEnabled: true, command: 'cat', envVars: [
+  containerTemplate(name: 'docker', image: 'docker', ttyEnabled: true, command: 'cat', envVars: [
     envVar(key: 'DOCKER_HOST', value: 'tcp://docker-host-docker-host:2375')
   ])
 ]) {
