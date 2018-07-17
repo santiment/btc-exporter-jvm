@@ -36,7 +36,7 @@ services:
   sbt:
     build:
       context: .
-      dockerfile: Dockerfile-test
+      dockerfile: Dockerfile-dev
       args:
         - UID
         - GID

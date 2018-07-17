@@ -15,12 +15,13 @@ USER dev-user
 
 COPY --chown=dev-user project /app/project/
 
-COPY --chown=dev-user *.sbt /app/
+COPY --chown=dev-user *.sbt .env /app/
 
-RUN sbt update
+RUN env $(grep -v '^#' .env | xargs) sbt update
 
 #COPY . /app/
 
 #RUN env $(grep -v '^#' .env | xargs) sbt update
 
-CMD sbt test
+
+CMD env $(grep -v '^#' .env | xargs) sbt
