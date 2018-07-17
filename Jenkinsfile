@@ -17,7 +17,7 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
         if (env.BRANCH_NAME == "master") {
           withCredentials([
             string(
-              credentialsId: 'aws_account_id'
+              credentialsId: 'aws_account_id',
               variable: 'aws_account_id'
             )
           ]) {
