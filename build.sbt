@@ -1,7 +1,6 @@
 import Dependencies._
 
-enablePlugins(JavaAppPackaging)
-enablePlugins(DockerPlugin)
+import sbtassembly.AssemblyPlugin.defaultUniversalScript
 
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
@@ -32,5 +31,12 @@ lazy val root = (project in file("."))
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 
-    buildInfoPackage := organization.value
-  )
+    buildInfoPackage := organization.value,
+
+    //Don't run tests during assembly
+    test in assembly := {},
+
+    assemblyJarName in assembly := "btc-exporter.jar",
+
+    assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(defaultUniversalScript(shebang = true)))
+)

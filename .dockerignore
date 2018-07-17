@@ -4,3 +4,7 @@ target/
 *.log
 .idea/
 .git
+Dockerfile
+Dockerfile-test
+Jenkinsfile
+docker-compose.yaml
