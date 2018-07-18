@@ -1,0 +1,43 @@
+version: '3'
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    #logging:
+    #    driver: none
+  kafka:
+    image: wurstmeister/kafka
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    depends_on:
+      - zookeeper
+    #volumes:
+    #  - /var/run/docker.sock:/var/run/docker.sock
+    #logging:
+    #    driver: none
+
+  test:
+    build:
+      image: hseeberger/scala-sbt:8u171_2.12.6_1.1.6
+
+    volumes:
+      - .:/app
+
+    depends_on:
+      - zookeeper
+      - kafka
+
+    command: ["sbt test it:test"]
+      
+    environment:
+      KAFKA_URL: kafka:9092
+      ZOOKEEPER_URL: zookeeper:2181
+      START_BLOCK: 52500
+      BITCOIND_URL: bitcoind
+      BITCOIND_PORT: 8332
+      BITCOIND_USER: 
+      BITCOIND_PASSWORD:
+      KAFKA_TOPIC: btc-transfers
+
+#volumes:
+#  kafka_data:
