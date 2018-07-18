@@ -21,7 +21,7 @@ services:
     #    driver: none
 
   consumer:
-    image: wurstmeister/kafka:2.11-1.0.1
+    image: wurstmeister/kafka:2.11-1.1.0
     depends_on:
       - zookeeper
       - kafka
