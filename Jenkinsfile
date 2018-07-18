@@ -1,5 +1,5 @@
 podTemplate(label: 'btc-exporter-jvm-builder', containers: [
-  containerTemplate(name: 'docker-compose', image: 'docker-compose', ttyEnabled: true, command: 'cat', envVars: [
+  containerTemplate(name: 'docker-compose', image: 'docker/compose:1.22.0', ttyEnabled: true, command: 'cat', envVars: [
     envVar(key: 'DOCKER_HOST', value: 'tcp://docker-host-docker-host:2375')
   ])
 ]) {
