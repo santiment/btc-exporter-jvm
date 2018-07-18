@@ -10,12 +10,14 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
     }
 
     container('docker-compose') {
-      stage('Build & test') {
-
-        sh "pwd"
-        sh "docker-compose --verbose -f compose-test.yml run build"
-        
+      stage('Build') {
+        sh "docker build -t btc-exporter-jvm-builder:${scmVars.GIT_COMMIT}"
       }
+
+      stage('Test') {
+        sh "TAG=${scmVars.GIT_COMMIT} docker-compose -f compose-test.yml run test"
+      }
+
 
       if (env.BRANCH_NAME == "master") {
         stage('Publish') {
