@@ -9,7 +9,7 @@ RUN sbt update
 
 COPY ./src/ /app/src/
 
-RUN sbt assembly
+RUN sbt compile test it:test assembly
 
 FROM openjdk:8u171-jre-alpine
 
