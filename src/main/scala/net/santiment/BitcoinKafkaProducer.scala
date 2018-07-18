@@ -9,6 +9,8 @@ import collection.JavaConverters._
 import scala.collection.mutable
 import java.{util => j}
 
+import scala.concurrent.Future
+
 class BitcoinKafkaProducer
 (
   world : {
@@ -249,8 +251,14 @@ class BitcoinKafkaProducer
    */
 
   def main(args: Array[String]): Unit = {
-
+    logger.info(s"Starting BTC exporter ${BuildInfo.version}")
     sys.addShutdownHook {
+      logger.info("Attempting graceful shutdown")
+      new Thread(()=>{
+        Thread.sleep(10000)
+        sys.exit(1)
+      }).start()
+
       world.closeEverythingQuietly()
       sys.exit(0)
     }
