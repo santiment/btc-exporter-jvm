@@ -1,8 +1,6 @@
 podTemplate(label: 'btc-exporter-jvm-builder', containers: [
   containerTemplate(name: 'docker-compose', image: 'docker/compose:1.22.0', ttyEnabled: true, command: 'cat', envVars: [
-    envVar(key: 'DOCKER_HOST', value: 'tcp://docker-host-docker-host:2375'),
-    envVar(key: 'BITCOIND_USER', value: credentials('bitcoind-user')),
-    envVar(key: 'BITCOIND_PASSWORD', value: credentials('bitcoind-password'))
+    envVar(key: 'DOCKER_HOST', value: 'tcp://docker-host-docker-host:2375')
   ])
 ]) {
   node('btc-exporter-jvm-builder') {
