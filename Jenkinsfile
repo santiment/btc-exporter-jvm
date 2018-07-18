@@ -2,10 +2,7 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
   containerTemplate(name: 'docker-compose', image: 'docker-compose', ttyEnabled: true, command: 'cat', envVars: [
     envVar(key: 'DOCKER_HOST', value: 'tcp://docker-host-docker-host:2375')
   ])
-], volumes: [
-    persistentVolumeClaim(mountPath: '/root/.ivy2/cache', claimName: 'ivy2-repo', readOnly: false)
-  ]
-) {
+]) {
   node('btc-exporter-jvm-builder') {
 
     stage('Checkout') {
