@@ -13,7 +13,6 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
       stage('Build & test') {
 
         sh "pwd"
-        sh "ls -l /app"
         sh "docker-compose -f compose-test.yml run build"
         
       }
