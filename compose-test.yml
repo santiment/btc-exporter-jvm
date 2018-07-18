@@ -18,7 +18,9 @@ services:
     #    driver: none
 
   test:
-    image: "localhost/btc-exporter-jvm-bulder:${TAG}"
+    build:
+      context: .
+      target: builder
 
     depends_on:
       - zookeeper
