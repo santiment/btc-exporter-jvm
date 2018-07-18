@@ -4,10 +4,8 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
   ])
 ]) {
   node('btc-exporter-jvm-builder') {
-
-    stage('Checkout') {
-      def scmVars = checkout scm 
-    }
+    
+    def scmVars = checkout scm 
 
     container('docker-compose') {
       stage('Build') {
