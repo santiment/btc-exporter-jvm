@@ -13,13 +13,19 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
       }
 
       stage('Test') {
-        environment {
-          BITCOIND_USER     = credentials('bitcoind-user')
-          BITCOIND_PASSWORD = credentials('bitcoind-password')
+        withCredentials([
+          string(
+            credentialsId: 'bitcoind-user',
+            variable: 'BICOIND_USER'
+          ),
+          string(
+            credentialsId: 'bicoind-password',
+            variable: 'BITCOIND_PASSWORD'
+          )
+        ]) {
+          sh "docker-compose -f compose-test.yml run test"
         }
-        sh "docker-compose -f compose-test.yml run test"
       }
-
 
       if (env.BRANCH_NAME == "master") {
         stage('Publish') {
