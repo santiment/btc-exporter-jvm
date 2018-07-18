@@ -13,7 +13,7 @@ class ZookeeperStoreSpec
     with TimeLimitedTests
     with LazyLogging{
 
-  val timeLimit: Span = 5 seconds
+  val timeLimit: Span = 30 seconds
 
   def withStore(test: Store[Integer] =>Any): Any = {
     val store = new ZookeeperStore[Integer](zk, "/test/node")
