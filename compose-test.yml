@@ -1,4 +1,5 @@
-version: '3'
+version: '3.4'
+# Version '3.4' is needed for the 'target' build key
 services:
   zookeeper:
     image: wurstmeister/zookeeper
