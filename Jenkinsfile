@@ -16,7 +16,7 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
         withCredentials([
           string(
             credentialsId: 'stage-bitcoind-user',
-            variable: 'BICOIND_USER'
+            variable: 'BITCOIND_USER'
           ),
           string(
             credentialsId: 'stage-bitcoind-password',
