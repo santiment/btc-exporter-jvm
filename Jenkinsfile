@@ -9,7 +9,7 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
 
     container('docker-compose') {
       stage('Build') {
-        sh "docker build -t btc-exporter-jvm-builder:${scmVars.GIT_COMMIT} ."
+        sh "docker build --target builder -t btc-exporter-jvm-builder:${scmVars.GIT_COMMIT} ."
       }
 
       stage('Test') {
