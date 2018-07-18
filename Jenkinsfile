@@ -15,7 +15,11 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
       }
 
       stage('Test') {
-        sh "TAG=${scmVars.GIT_COMMIT} docker-compose -f compose-test.yml run test"
+        environment {
+          BITCOIND_USER     = credentials('bitcoind-user')
+          BITCOIND_PASSWORD = credentials('bitcoind-password')
+        }
+        sh "docker-compose -f compose-test.yml run test"
       }
 
 

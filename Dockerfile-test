@@ -1,26 +1,15 @@
 FROM hseeberger/scala-sbt:8u171_2.12.6_1.1.6
 
-ARG UID
-
-RUN useradd --uid $UID dev-user --create-home &&\
-    mv /root/.sbt /home/dev-user/.sbt &&\
-    chown --recursive dev-user /home/dev-user/.sbt &&\
-    rm -rf /app &&\
-    mkdir /app &&\
-    chown dev-user /app
-
 WORKDIR /app
 
-USER dev-user
+COPY project /app/project/
 
-COPY --chown=dev-user project /app/project/
-
-COPY --chown=dev-user *.sbt /app/
+COPY *.sbt /app/
 
 RUN sbt update
 
-#COPY . /app/
+COPY . /app/
 
-#RUN env $(grep -v '^#' .env | xargs) sbt update
+RUN sbt compile
 
-CMD sbt test
+CMD sbt test it:test assembly
