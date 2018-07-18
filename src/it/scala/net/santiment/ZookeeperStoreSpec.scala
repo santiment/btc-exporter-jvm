@@ -28,9 +28,13 @@ class ZookeeperStoreSpec
 
   test ("It should work") {
     withStore { store =>
+      logger.info("Creating")
       store.create(10)
+      logger.info("Getting")
       val result = store.read.get
+      logger.info("Deleting")
       assert(result == 10)
+
     }
   }
 
