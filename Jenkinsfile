@@ -23,7 +23,11 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
             variable: 'BITCOIND_PASSWORD'
           )
         ]) {
-          sh "docker-compose -f compose-test.yml run test"
+          try {
+            sh "docker-compose -f compose-test.yml run test"
+          } finally {
+            sh "docker-compose -f compose-test.yml down -v"
+          }
         }
       }
 
