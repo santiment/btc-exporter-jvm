@@ -17,4 +17,4 @@ WORKDIR /app
 
 COPY --from=builder /app/target/scala-2.12/btc-exporter.jar /app/btc-exporter.jar
 
-CMD btc-exporter.jar
+CMD /app/btc-exporter.jar
