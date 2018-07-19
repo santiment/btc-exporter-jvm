@@ -66,10 +66,15 @@ put in the environment.
 To build the final docker image use
 
 ``` sh
-$ sbt docker:publishLocal
+$ docker build -t localhst/btc-exporter-jvm .
 ```
 
-This will build the image and publish it locally. You need to have
-`docker` installed in the environment where `sbt` is run.
+This will build the image and publish it locally.
 
+## CI/CD
+
+This project is built using Jenkins. Jenkins will run all unit and
+integration tests. The tests are run using the docker-compose file
+`compose-test.yml` This file describes all the services that need to
+be set-up during the integration tests
 
