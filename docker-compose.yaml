@@ -30,7 +30,7 @@ services:
       - --bootstrap-server
       - kafka:9092
       - --topic
-      - btc-transfers
+      - btc-transfers-1
       - --from-beginning
 
   sbt:

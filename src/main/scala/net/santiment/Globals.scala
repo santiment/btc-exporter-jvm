@@ -11,8 +11,10 @@ import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.ExponentialBackoffRetry
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
+
 import collection.JavaConverters._
 import Store.IntSerde
+import org.apache.kafka.clients.admin.AdminClient
 
 /**
   * Configuration class with given default values. If you want to change some of those for testing, extend the class anc override the necessary settings
@@ -35,7 +37,7 @@ class Config {
     namespace = s"${BuildInfo.name}",
   )
 
-  lazy val kafkaTopic = sys.env("KAFKA_TOPIC")
+  lazy val kafkaTopic = "btc-transfers-1"
 
   lazy val zkLastWrittenPath = s"/$kafkaTopic/last-writen-block-height"
   lazy val zkLastComittedPath = s"/$kafkaTopic/last-commited-block-height"
@@ -44,6 +46,10 @@ class Config {
 
   //5 minutes sleep after block is processed. (Bitcoin makes one block each 10 minutes so this should be even larger)
   lazy val sleepBetweenRunsMs = 300000
+
+  lazy val zkNextMigrationPath = "/migration/next"
+  lazy val zkNextMigrationToCleanPath = "/migration/nextToDestroy"
+
 }
 
 /**
@@ -56,9 +62,20 @@ class Globals extends LazyLogging
 
   lazy val zk:CuratorFramework = makeZookeeperClient(config.zk)
 
+  lazy val adminClient: AdminClient = makeKafkaAdminClient(config.kafka)
+
+  //Migration store data
+  lazy val nextMigrationStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkNextMigrationPath)
+  lazy val nextMigrationToCleanStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkNextMigrationToCleanPath)
+  lazy val migrations = new Migrations(adminClient)
+  lazy val migrator = new Migrator(migrations.migrations, nextMigrationStore, nextMigrationToCleanStore)
+
+
   lazy val lastWrittenHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastWrittenPath)
   lazy val lastCommittedHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastComittedPath)
   lazy val lastBlockStore: TransactionalStore[Int] = new SimpleTxStore[Int](lastWrittenHeightStore, lastCommittedHeightStore)
+
+
 
   lazy val producer:KafkaProducer[String, Array[Byte]] = makeKafkaProducer(config.kafka)
   lazy val sink:TransactionalSink[ResultTx] = new KafkaSink[ResultTx](producer, config.kafkaTopic)
@@ -149,6 +166,12 @@ class Globals extends LazyLogging
     logger.info(s"Connected to Kafka at ${config.bootstrapServers}")
 
     client
+  }
+
+  def makeKafkaAdminClient(config:KafkaConfig):AdminClient = {
+    val properties = new Properties()
+    properties.put("bootstrap.servers", config.bootstrapServers)
+    AdminClient.create(properties)
   }
 
   /**

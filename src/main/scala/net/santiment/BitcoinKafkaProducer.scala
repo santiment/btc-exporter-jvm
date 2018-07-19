@@ -19,6 +19,7 @@ class BitcoinKafkaProducer
     val lastBlockStore: TransactionalStore[Int]
     val sink: TransactionalSink[ResultTx]
     def closeEverythingQuietly (): Unit
+    val migrator: Migrator
   }
 )
   extends LazyLogging
@@ -252,6 +253,9 @@ class BitcoinKafkaProducer
 
   def main(args: Array[String]): Unit = {
     logger.info(s"Starting BTC exporter ${BuildInfo.version}")
+
+    world.migrator.up()
+/*
     sys.addShutdownHook {
       logger.info("Attempting graceful shutdown")
       new Thread(()=>{
@@ -262,6 +266,8 @@ class BitcoinKafkaProducer
       world.closeEverythingQuietly()
       sys.exit(0)
     }
+*/
+
 
     try {
       // Get last written block or 0 if none exist yet
