@@ -38,15 +38,21 @@ extends LazyLogging {
 }
 
 class Migrations(kafka: AdminClient) {
-  val migrations:Array[Migration] = Array(
-    Migration(name = "Create topic btc-transfers-1",
+
+  private def topicMigration(topic:String, numPartitions:Int, replicationFactor:Short): Migration =
+    Migration(
+      name = s"Create topic $topic",
       up = ()=> {
-        val topic = new NewTopic("btc-tranfers-1",1,3)
-        kafka.createTopics(Seq(topic).asJava)
+        val t = new NewTopic(topic,numPartitions,replicationFactor)
+        kafka.createTopics(Seq(t).asJava)
       },
 
       clean = ()=>{
-        kafka.deleteTopics(Seq("btc-transfers-1").asJava)
+        kafka.deleteTopics(Seq(topic).asJava)
       })
+
+  val migrations:Array[Migration] = Array(
+    topicMigration("btc-tranfers-1",1,3),
+    topicMigration("btc-transfers-1",1,3)
   )
 }
