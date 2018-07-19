@@ -16,7 +16,7 @@ class BitcoinKafkaProducer
   world : {
     val config: Config
     val bitcoin: BitcoinClient
-    val lastBlockStore: TransactionalStore[Integer]
+    val lastBlockStore: TransactionalStore[Int]
     val sink: TransactionalSink[ResultTx]
     def closeEverythingQuietly (): Unit
   }
@@ -205,7 +205,7 @@ class BitcoinKafkaProducer
     txs.size()
   }
 
-  def makeTxProcessor(lastBlock:TransactionalStore[Integer], sink:TransactionalSink[ResultTx], processor:Int=>Int)(height:Int): Int = {
+  def makeTxProcessor(lastBlock:TransactionalStore[Int], sink:TransactionalSink[ResultTx], processor:Int=>Int)(height:Int): Int = {
     //Start a new transaction
     sink.begin()
     logger.trace(s"current_block=$height, begin_transaction")

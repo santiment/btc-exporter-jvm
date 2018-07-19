@@ -12,6 +12,7 @@ import org.apache.curator.retry.ExponentialBackoffRetry
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import collection.JavaConverters._
+import Store.IntSerde
 
 /**
   * Configuration class with given default values. If you want to change some of those for testing, extend the class anc override the necessary settings
@@ -55,9 +56,9 @@ class Globals extends LazyLogging
 
   lazy val zk:CuratorFramework = makeZookeeperClient(config.zk)
 
-  lazy val lastWrittenHeightStore: Store[Integer] = new ZookeeperStore[Integer](zk, config.zkLastWrittenPath)
-  lazy val lastCommittedHeightStore: Store[Integer] = new ZookeeperStore[Integer](zk, config.zkLastComittedPath)
-  lazy val lastBlockStore: TransactionalStore[Integer] = new SimpleTxStore[Integer](lastWrittenHeightStore, lastCommittedHeightStore)
+  lazy val lastWrittenHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastWrittenPath)
+  lazy val lastCommittedHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastComittedPath)
+  lazy val lastBlockStore: TransactionalStore[Int] = new SimpleTxStore[Int](lastWrittenHeightStore, lastCommittedHeightStore)
 
   lazy val producer:KafkaProducer[String, Array[Byte]] = makeKafkaProducer(config.kafka)
   lazy val sink:TransactionalSink[ResultTx] = new KafkaSink[ResultTx](producer, config.kafkaTopic)

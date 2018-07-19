@@ -6,9 +6,9 @@ trait Transactional {
   def abort():Unit
 }
 
-trait TransactionalStore[T <: java.io.Serializable] extends Store[T] with Transactional
+trait TransactionalStore[T] extends Store[T] with Transactional
 
-class SimpleTxStore[T <: java.io.Serializable](writeStore:Store[T], commitStore:Store[T])
+class SimpleTxStore[T](writeStore:Store[T], commitStore:Store[T])
 extends TransactionalStore[T]
 {
   //Check if valid

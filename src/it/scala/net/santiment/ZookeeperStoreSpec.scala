@@ -7,6 +7,7 @@ import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 
 import Globals._
+import Store.IntSerde
 
 class ZookeeperStoreSpec
   extends FunSuite
@@ -15,9 +16,9 @@ class ZookeeperStoreSpec
 
   override val timeLimit: Span = 30 seconds
 
-  def withStore(test: Store[Integer] =>Any): Any = {
+  def withStore(test: Store[Int] =>Any): Any = {
     logger.info(s"Initializing ${timeLimit}")
-    val store = new ZookeeperStore[Integer](zk, "/test/node")
+    val store = new ZookeeperStore[Int](zk, "/test/node")
     logger.info("Initialized")
     try {
       test(store)
