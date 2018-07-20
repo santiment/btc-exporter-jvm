@@ -1,5 +1,6 @@
 package net.santiment
 
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
@@ -114,10 +115,15 @@ object BitcoinClient extends LazyLogging {
     case script if ScriptPattern.isOpReturn(script) =>
       BitcoinAddress("","NULL")
 
-    //Unsupported address types
-    case script =>
-      throw new ScriptException(s"Unknown script ${script.toString}")
-  }
+    //6. Multisig script
+    case script if ScriptPattern.isSentToMultisig(script) =>
+      throw new ScriptException(s"Multisig script - unsupported")
 
+
+    case script =>
+      val address = new String(Base64.getEncoder.encode(script.getProgram))
+      BitcoinAddress(s"unknown:$address", "UNKNOWN")
+
+  }
 
 }
