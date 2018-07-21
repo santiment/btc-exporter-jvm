@@ -54,4 +54,11 @@ class BitcoinClientSpec extends FunSuite {
     val address = BitcoinClient.extractAddress(script)
     assert(address.kind == "UNKNOWN")
   }
+
+  test("Testing invalid pubkey") {
+    //Taken from output 1 from tx b728387a3cf1dfcff1eef13706816327907f79f9366a7098ee48fc0c00ad2726
+    val script: Script = new Script(Utils.HEX.decode("40f816b480f87144ec4de5862adf028ff66cc6964250325d53fd22bf8922824b6f1e1f2c881ae0608ec77ebf88a75c66d3099113a7343238f2f7a0ebb91a4ed335ac"))
+    val address = BitcoinClient.extractAddress(script)
+    assert(address.kind == "UNKNOWN")
+  }
 }

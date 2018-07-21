@@ -81,8 +81,15 @@ object BitcoinClient extends LazyLogging {
 
     //2. P2PK (We still convert to newform addresses
     case script if ScriptPattern.isPayToPubKey(script) =>
-      val address = script.getToAddress(mainNetParams, true)
-      BitcoinAddress(address.toBase58, "P2PK")
+      try {
+        val address = script.getToAddress(mainNetParams, true)
+        BitcoinAddress(address.toBase58, "P2PK")
+      } catch {
+        case _:IllegalArgumentException =>
+          //The cause for this case is tx b728387a3cf1dfcff1eef13706816327907f79f9366a7098ee48fc0c00ad2726
+          val address = new String(Base64.getEncoder.encode(script.getProgram))
+          BitcoinAddress(s"unknown:invalidpubkey:$address","UNKNOWN")
+      }
 
 
     //3. P2SH
