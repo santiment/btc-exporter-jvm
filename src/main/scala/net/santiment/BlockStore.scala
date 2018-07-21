@@ -15,7 +15,7 @@ import scala.collection.mutable
   * @param client - Bitcoin client used for getting data
   */
 
-class BlockStore(client:BitcoinClient) extends LazyLogging with Periodic[CacheStats] {
+class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with Periodic[CacheStats] {
 
   override val period: Int = 60000
 
@@ -27,8 +27,8 @@ class BlockStore(client:BitcoinClient) extends LazyLogging with Periodic[CacheSt
 
   // Cache for storing tx outputs
   val outputCache:LoadingCache[OutputKey,TransactionOutput] = CacheBuilder.newBuilder()
-    .maximumSize(1000000)
-    .initialCapacity(1000000)
+    .maximumSize(cacheSize)
+    .initialCapacity(cacheSize)
     .recordStats()
     .build(new CacheLoader[OutputKey, TransactionOutput] {
       override def load(key: OutputKey): TransactionOutput = {
@@ -113,6 +113,7 @@ class BlockStore(client:BitcoinClient) extends LazyLogging with Periodic[CacheSt
   def getOutput(input:TransactionInput):TransactionOutput = {
     val key = OutputKey.fromOutpoint(input.getOutpoint)
     logger.debug(s"get: $key")
+
     val output = outputCache.get(key)
     outputCache.invalidate(key)
     output

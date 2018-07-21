@@ -50,6 +50,7 @@ class Config {
   lazy val zkNextMigrationPath = "/migration/next"
   lazy val zkNextMigrationToCleanPath = "/migration/nextToDestroy"
 
+  lazy val numOutputsCached: Int = sys.env.getOrElse("NUM_OUTPUTS_CACHED","1000").toInt
 }
 
 /**
@@ -83,7 +84,7 @@ class Globals extends LazyLogging
   lazy val bitcoindJsonRpcClient: JsonRpcHttpClient = makeBitcoindJsonRpcClient(config.bitcoind)
 
   lazy val bitcoinClient:BitcoinClient = new BitcoinClient(bitcoindJsonRpcClient)
-  lazy val bitcoin = new BlockStore(bitcoinClient)
+  lazy val bitcoin = new BlockStore(bitcoinClient, config.numOutputsCached)
 
   def makeBitcoindJsonRpcClient(config:BitcoinClientConfig): JsonRpcHttpClient = {
 
