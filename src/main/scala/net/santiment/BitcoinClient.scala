@@ -166,13 +166,27 @@ object BitcoinClient extends LazyLogging {
       val numKeys = ScriptPattern.decodeFromOpN(chunks.get(chunks.size-2).opcode)
       val numSigs = ScriptPattern.decodeFromOpN(chunks.get(0).opcode)
 
-      val address = (for(i<- 1 to numKeys) yield {
+      val addresses: Seq[String] = (for(i<- 1 to numKeys) yield {
         val chunk = chunks.get(i)
-        val addr = ECKey.fromPublicOnly(chunk.data).toAddress(mainNetParams)
-        addr.toBase58
-      }).mkString(":")
+        try {
+          val addr = ECKey.fromPublicOnly(chunk.data).toAddress(mainNetParams)
+          Seq[String](addr.toBase58)
+        } catch {
+          case e:IllegalArgumentException =>
+            //added to deal with tx 274f8be3b7b9b1a220285f5f71f61e2691dd04df9d69bb02a8b3b85f91fb1857
+            //Any invalid address cannot be used to spend a multisig tx. But the valid addresses still can be used
+            Seq[String]()
+        }
+      }).flatten
 
-      return BitcoinAddress(s"multisig:$numSigs:$numKeys:$address","MULTISIG")
+      // If after the above procedure we get only one valid address and numSigs is 1, then
+      // we will treat this as a normal address
+      if(numSigs == 1 && addresses.size == 1) {
+        BitcoinAddress(addresses.head,"MULTISIG")
+      } else {
+        val addrstr = addresses.mkString(":")
+        BitcoinAddress(s"multisig:$numSigs:$numKeys:$addrstr", "MULTISIG")
+      }
 
 
     case script =>

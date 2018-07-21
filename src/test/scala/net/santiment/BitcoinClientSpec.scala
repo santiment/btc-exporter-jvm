@@ -69,4 +69,11 @@ class BitcoinClientSpec extends FunSuite {
     assert(address.kind == "MULTISIG")
     assert(address.address == "multisig:1:2:1AJbsFZ64EpEfS5UAjAfcUG8pH8Jn3rn1F:1A8JiWcwvpY7tAopUkSnGuEYHmzGYfZPiq")
   }
+
+  test("Testing multisig containing invalid key, tx=274f8be3b7b9b1a220285f5f71f61e2691dd04df9d69bb02a8b3b85f91fb1857") {
+    val script: Script = new Script(Utils.HEX.decode("51210351efb6e91a31221652105d032a2508275f374cea63939ad72f1b1e02f477da782100f2b7816db49d55d24df7bdffdbc1e203b424e8cd39f5651ab938e5e4a193569e52ae"))
+    val address = BitcoinClient.extractAddress(script)
+    assert(address.kind == "MULTISIG")
+    assert(address.address == "1NdB761LmTmrJixxp93nz7pEiCx5cKPW44")
+  }
 }
