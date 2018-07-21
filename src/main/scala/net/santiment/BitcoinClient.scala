@@ -64,6 +64,10 @@ extends LazyLogging {
 
 case class BitcoinAddress(address:String, kind:String)
 
+object BitcoinAddress {
+  val nullAddress: BitcoinAddress = BitcoinAddress("","NULL")
+}
+
 
 object BitcoinClient extends LazyLogging {
 
@@ -127,7 +131,7 @@ object BitcoinClient extends LazyLogging {
 
     //5. Null script
     case script if ScriptPattern.isOpReturn(script) =>
-      BitcoinAddress("","NULL")
+      BitcoinAddress.nullAddress
 
     //6. Old-style Multisig script
     case script if ScriptPattern.isSentToMultisig(script) =>

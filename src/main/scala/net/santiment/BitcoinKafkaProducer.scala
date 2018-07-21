@@ -108,9 +108,18 @@ class BitcoinKafkaProducer
 
       //Get list of debits and credits
       var debits = for(output:TransactionOutput <- tx.getOutputs.asScala) yield {
-        val account = BitcoinClient.extractAddress(output.getScriptPubKey)
+
+        //The following check is due to tx ebc9fa1196a59e192352d76c0f6e73167046b9d37b8302b6bb6968dfd279b767
+        val scriptOpt = try {
+          Some(output.getScriptPubKey)
+        } catch {
+          case e:ScriptException => None
+        }
+
+        val account = for ( script <- scriptOpt ) yield BitcoinClient.extractAddress(script)
+
         val value:Coin = output.getValue
-        TransactionEntry(account,value)
+        TransactionEntry(account.getOrElse(BitcoinAddress.nullAddress),value)
       }
 
       //Connect input to parents and return input list
