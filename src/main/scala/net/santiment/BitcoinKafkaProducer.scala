@@ -15,7 +15,7 @@ class BitcoinKafkaProducer
 (
   world : {
     val config: Config
-    val bitcoin: BitcoinClient
+    val bitcoin: BlockStore
     val lastBlockStore: TransactionalStore[Int]
     val sink: TransactionalSink[ResultTx]
     def closeEverythingQuietly (): Unit
@@ -101,22 +101,7 @@ class BitcoinKafkaProducer
     var blockFees = 0L
 
     logger.trace(s"current_block=$height, fetched_txs=${txs.size()}")
-    val inputHashes = mutable.HashSet[Sha256Hash]()
-
-    // Gather all input transactions that need to be retrieved
-    for(
-      tx:Transaction <- nonCoinbaseTxs.asScala;
-      input:TransactionInput <- tx.getInputs.asScala
-    ) {
-      val hash = input.getOutpoint.getHash
-      inputHashes.add(hash)
-    }
-
-
-    //Get all parent transactions
-    val parents:collection.Map[Sha256Hash,Transaction] = world.bitcoin.getTxList(inputHashes)
-    logger.debug(s"Retrieved parent txs $parents")
-
+    world.bitcoin.cacheOutputs(nonCoinbaseTxs)
 
     //Process all non-coinbase txs and calculate the fees
     for(tx:Transaction <- nonCoinbaseTxs.asScala) {
@@ -130,15 +115,10 @@ class BitcoinKafkaProducer
 
       //Connect input to parents and return input list
       val credits = for(input:TransactionInput <- tx.getInputs.asScala) yield {
+        val output = world.bitcoin.getOutput(input)
 
-        val result = input.connect(parents.asJava, ConnectMode.DISCONNECT_ON_CONFLICT)
-        if (result != ConnectionResult.SUCCESS) {
-          logger.error(s"Cannot connect tx for input from tx ${tx.getHashAsString}. Result is $result")
-          throw new IllegalStateException()
-        }
-
-        val account = BitcoinClient.extractAddress(input.getConnectedOutput.getScriptPubKey)
-        val value: Coin = input.getConnectedOutput.getValue
+        val account = BitcoinClient.extractAddress(output.getScriptPubKey)
+        val value: Coin = output.getValue
 
         //We store credits as negative values
         TransactionEntry(account, value.negate())
