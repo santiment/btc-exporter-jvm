@@ -15,6 +15,8 @@ FROM openjdk:8u171-jre-alpine
 
 WORKDIR /app
 
+ENV JAVA_OPTS -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
+
 COPY --from=builder /app/target/scala-2.12/btc-exporter.jar /app/btc-exporter.jar
 
 CMD /app/btc-exporter.jar
