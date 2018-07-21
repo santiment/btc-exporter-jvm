@@ -17,7 +17,8 @@ import scala.concurrent.{Await, Future}
 import scala.collection.JavaConverters._
 
 
-class BitcoinClient(private val client:JsonRpcHttpClient) {
+class BitcoinClient(private val client:JsonRpcHttpClient)
+extends LazyLogging with Periodic {
 
   def getBlockHash(height:Integer):Sha256Hash = {
     client.invoke("getblockhash",Array(height),classOf[Sha256Hash])
@@ -47,7 +48,9 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
   case class UnspentTx(tx:Transaction, var counter:Int)
 
   val txCache:LoadingCache[Sha256Hash,UnspentTx] = CacheBuilder.newBuilder()
-    .maximumSize(100000)
+    .maximumSize(50000)
+    .initialCapacity(50000)
+    .recordStats()
     .build(new CacheLoader[Sha256Hash, UnspentTx] {
       override def load(key: Sha256Hash): UnspentTx = {
         val tx = getTx(key)
@@ -76,7 +79,12 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
       }
     }
 
-    Await.result(Future.sequence(futures), Duration.create(30, TimeUnit.SECONDS)).toMap[Sha256Hash, Transaction]
+    val result = Await.result(Future.sequence(futures), Duration.create(30, TimeUnit.SECONDS)).toMap[Sha256Hash, Transaction]
+    occasionally {
+      val stats = txCache.stats()
+      logger.info(s"Cache stats $stats")
+    }
+    result
   }
 
   def blockCount:Int = {
