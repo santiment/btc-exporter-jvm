@@ -27,8 +27,8 @@ class BlockStore(client:BitcoinClient) extends LazyLogging with Periodic[CacheSt
 
   // Cache for storing tx outputs
   val outputCache:LoadingCache[OutputKey,TransactionOutput] = CacheBuilder.newBuilder()
-    .maximumSize(100000)
-    .initialCapacity(100000)
+    .maximumSize(1000000)
+    .initialCapacity(1000000)
     .recordStats()
     .build(new CacheLoader[OutputKey, TransactionOutput] {
       override def load(key: OutputKey): TransactionOutput = {
