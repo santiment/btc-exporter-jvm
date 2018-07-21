@@ -20,6 +20,8 @@ import scala.collection.JavaConverters._
 class BitcoinClient(private val client:JsonRpcHttpClient)
 extends LazyLogging with Periodic {
 
+  override val period = 60000
+  
   def getBlockHash(height:Integer):Sha256Hash = {
     client.invoke("getblockhash",Array(height),classOf[Sha256Hash])
   }
