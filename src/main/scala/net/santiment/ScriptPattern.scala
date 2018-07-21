@@ -139,6 +139,7 @@ object ScriptPattern {
     try { // Second to last chunk must be an OP_N opcode and there should be that many data chunks (keys).
       val m = chunks.get(chunks.size - 2)
       if (!m.isOpCode) return false
+
       val numKeys = decodeFromOpN(m.opcode)
       if (numKeys < 1 || (chunks.size != 3 + numKeys)) return false
       var i = 1
@@ -154,7 +155,7 @@ object ScriptPattern {
       // First chunk must be an OP_N opcode too.
       if (decodeFromOpN(chunks.get(0).opcode) < 1) return false
     } catch {
-      case e: IllegalStateException =>
+      case e: IllegalArgumentException =>
         return false // Not an OP_N opcode.
 
     }
