@@ -1,14 +1,15 @@
 package net.santiment
 
-trait Periodic {
+trait Periodic[State] {
   val period: Int = 10000
 
+  var state:State = _
   private var startTs = System.currentTimeMillis()
 
-  def occasionally(f: => Unit):Unit = {
+  def occasionally(f: State => State):Unit = {
     var test = System.currentTimeMillis()
     if (test - startTs >= period) {
-      f
+      state = f(state)
       startTs = test
 
     }

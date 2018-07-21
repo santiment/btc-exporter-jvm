@@ -18,9 +18,7 @@ import scala.collection.JavaConverters._
 
 
 class BitcoinClient(private val client:JsonRpcHttpClient)
-extends LazyLogging with Periodic {
-
-  override val period = 60000
+extends LazyLogging {
 
   def getBlockHash(height:Integer):Sha256Hash = {
     client.invoke("getblockhash",Array(height),classOf[Sha256Hash])
@@ -32,10 +30,6 @@ extends LazyLogging with Periodic {
     val serializedBlock = Utils.HEX.decode(serializedBlockString)
     val block = BitcoinClient.serializer.makeBlock(serializedBlock)
 
-    //Cache all txs
-    for (tx <- block.getTransactions.asScala) {
-      txCache.put(tx.getHash, UnspentTx(tx,tx.getOutputs.size()))
-    }
     block
   }
 
@@ -47,27 +41,6 @@ extends LazyLogging with Periodic {
     BitcoinClient.serializer.makeTransaction(serialized)
   }
 
-  case class UnspentTx(tx:Transaction, var counter:Int)
-
-  val txCache:LoadingCache[Sha256Hash,UnspentTx] = CacheBuilder.newBuilder()
-    .maximumSize(1000)
-    .initialCapacity(1000)
-    .build(new CacheLoader[Sha256Hash, UnspentTx] {
-      override def load(key: Sha256Hash): UnspentTx = {
-        val tx = getTx(key)
-        UnspentTx(tx,1)
-      }
-    })
-
-  def getTxCached(txHash:Sha256Hash):Transaction = {
-    val utx = txCache.get(txHash)
-    utx.counter -= 1
-    if(utx.counter == 0) {
-      txCache.invalidate(txHash)
-    }
-    utx.tx
-  }
-
   /**
     * Returns the transactions corresponding to a list of hashes. Can be implemented using batching JSON calls in theory.
     * @param hashes - the list of hashes
@@ -76,7 +49,7 @@ extends LazyLogging with Periodic {
   def getTxList(hashes:collection.Set[Sha256Hash]):collection.Map[Sha256Hash, Transaction] = {
     val futures = hashes.map {
       hash => Future {
-        (hash, getTxCached(hash))
+        (hash, getTx(hash))
       }
     }
 

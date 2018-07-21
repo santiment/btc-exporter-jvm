@@ -82,7 +82,8 @@ class Globals extends LazyLogging
 
   lazy val bitcoindJsonRpcClient: JsonRpcHttpClient = makeBitcoindJsonRpcClient(config.bitcoind)
 
-  lazy val bitcoin:BitcoinClient = new BitcoinClient(bitcoindJsonRpcClient)
+  lazy val bitcoinClient:BitcoinClient = new BitcoinClient(bitcoindJsonRpcClient)
+  lazy val bitcoin = new BlockStore(bitcoinClient)
 
   def makeBitcoindJsonRpcClient(config:BitcoinClientConfig): JsonRpcHttpClient = {
 
