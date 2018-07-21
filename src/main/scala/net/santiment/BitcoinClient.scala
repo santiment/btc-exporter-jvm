@@ -1,8 +1,9 @@
 package net.santiment
 
 import java.util.Base64
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ExecutionException, TimeUnit}
 
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
 import org.bitcoinj.core._
@@ -12,6 +13,8 @@ import org.bitcoinj.script.Script
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+
+import scala.collection.JavaConverters._
 
 
 class BitcoinClient(private val client:JsonRpcHttpClient) {
@@ -24,7 +27,13 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
     val hash = getBlockHash(height)
     val serializedBlockString = client.invoke("getblock", Array(hash.toString,0), classOf[String])
     val serializedBlock = Utils.HEX.decode(serializedBlockString)
-    BitcoinClient.serializer.makeBlock(serializedBlock)
+    val block = BitcoinClient.serializer.makeBlock(serializedBlock)
+
+    //Cache all txs
+    for (tx <- block.getTransactions.asScala) {
+      txCache.put(tx.getHash, tx)
+    }
+    block
   }
 
   def getTx(txHash:Sha256Hash):Transaction = {
@@ -35,6 +44,16 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
     BitcoinClient.serializer.makeTransaction(serialized)
   }
 
+  val txCache:LoadingCache[Sha256Hash,Transaction] = CacheBuilder.newBuilder()
+    .maximumSize(1000000)
+    .build(new CacheLoader[Sha256Hash, Transaction] {
+      override def load(key: Sha256Hash): Transaction = getTx(key)
+    })
+
+  def getTxCached(txHash:Sha256Hash):Transaction = {
+    txCache.get(txHash)
+  }
+
   /**
     * Returns the transactions corresponding to a list of hashes. Can be implemented using batching JSON calls in theory.
     * @param hashes - the list of hashes
@@ -43,7 +62,7 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
   def getTxList(hashes:collection.Set[Sha256Hash]):collection.Map[Sha256Hash, Transaction] = {
     val futures = hashes.map {
       hash => Future {
-        (hash, getTx(hash))
+        (hash, getTxCached(hash))
       }
     }
 
