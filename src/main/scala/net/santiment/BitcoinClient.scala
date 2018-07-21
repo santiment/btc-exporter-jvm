@@ -31,7 +31,7 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
 
     //Cache all txs
     for (tx <- block.getTransactions.asScala) {
-      txCache.put(tx.getHash, tx)
+      txCache.put(tx.getHash, UnspentTx(tx,tx.getOutputs.size()))
     }
     block
   }
@@ -44,14 +44,24 @@ class BitcoinClient(private val client:JsonRpcHttpClient) {
     BitcoinClient.serializer.makeTransaction(serialized)
   }
 
-  val txCache:LoadingCache[Sha256Hash,Transaction] = CacheBuilder.newBuilder()
-    .maximumSize(1000000)
-    .build(new CacheLoader[Sha256Hash, Transaction] {
-      override def load(key: Sha256Hash): Transaction = getTx(key)
+  case class UnspentTx(tx:Transaction, var counter:Int)
+
+  val txCache:LoadingCache[Sha256Hash,UnspentTx] = CacheBuilder.newBuilder()
+    .maximumSize(100000)
+    .build(new CacheLoader[Sha256Hash, UnspentTx] {
+      override def load(key: Sha256Hash): UnspentTx = {
+        val tx = getTx(key)
+        UnspentTx(tx,1)
+      }
     })
 
   def getTxCached(txHash:Sha256Hash):Transaction = {
-    txCache.get(txHash)
+    val utx = txCache.get(txHash)
+    utx.counter -= 1
+    if(utx.counter == 0) {
+      txCache.invalidate(txHash)
+    }
+    utx.tx
   }
 
   /**
