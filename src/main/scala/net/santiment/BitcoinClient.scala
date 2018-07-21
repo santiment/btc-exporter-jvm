@@ -50,8 +50,8 @@ extends LazyLogging with Periodic {
   case class UnspentTx(tx:Transaction, var counter:Int)
 
   val txCache:LoadingCache[Sha256Hash,UnspentTx] = CacheBuilder.newBuilder()
-    .maximumSize(10000)
-    .initialCapacity(10000)
+    .maximumSize(1000)
+    .initialCapacity(1000)
     .build(new CacheLoader[Sha256Hash, UnspentTx] {
       override def load(key: Sha256Hash): UnspentTx = {
         val tx = getTx(key)
