@@ -122,9 +122,20 @@ object BitcoinClient extends LazyLogging {
     case script if ScriptPattern.isOpReturn(script) =>
       BitcoinAddress("","NULL")
 
-    //6. Multisig script
+    //6. Old-style Multisig script
     case script if ScriptPattern.isSentToMultisig(script) =>
-      throw new ScriptException(s"Multisig script - unsupported")
+      val chunks = script.getChunks
+
+      val numKeys = ScriptPattern.decodeFromOpN(chunks.get(chunks.size-2).opcode)
+      val numSigs = ScriptPattern.decodeFromOpN(chunks.get(0).opcode)
+
+      val address = (for(i<- 1 to numKeys) yield {
+        val chunk = chunks.get(i)
+        val addr = ECKey.fromPublicOnly(chunk.data).toAddress(mainNetParams)
+        addr.toBase58
+      }).mkString(":")
+
+      return BitcoinAddress(s"multisig:$numSigs:$numKeys:$address","MULTISIG")
 
 
     case script =>
