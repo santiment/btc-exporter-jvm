@@ -37,6 +37,10 @@ case class KafkaStats
     flush - other.flush,
     flushTime - other.flushTime
   )
+
+  override def toString: String = {
+    s"KafkaStats(begin=$begin, beginTime=$beginTime, commit=$commit, commitTime=$commitTime, abort=$abort, abortTime=$abortTime, send=$send, sendTime=$sendTime, flush=$flush, flushTime=$flushTime)"
+  }
 }
 
 
@@ -69,7 +73,8 @@ class KafkaSink[T](producer:KafkaProducer[String, Array[Byte]], topic:String)
     occasionally( oldStats => {
       val diff = if (oldStats != null) {stats.minus(oldStats)} else stats
       logger.info(s"Kafka stats: $diff")
-      stats
+
+      stats.copy()
     })
 
   }

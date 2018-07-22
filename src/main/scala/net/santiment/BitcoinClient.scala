@@ -35,6 +35,10 @@ case class BitcoinClientStats
     getTxListTime - other.getTxListTime
   )
 
+  override def toString: String = {
+    s"BitcoinClientStats(getBlock=$getBlock, getBlockTime=$getBlockTime, getTx=$getTx, getTxTime=$getTxTime, getTxList=$getTxList, getTxListTime=$getTxListTime)"
+  }
+
 }
 
 class BitcoinClient(private val client:JsonRpcHttpClient)
@@ -90,7 +94,7 @@ extends LazyLogging {
 
     val futures = hashes.map {
       hash => Future {
-        (hash, getTx(hash))
+        (hash, _getTx(hash))
       }
     }
 

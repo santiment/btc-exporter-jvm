@@ -84,7 +84,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     //Print cache stats
     occasionally( oldStats => {
       val cacheStats = outputCache.stats()
-      val btcStats = client.stats
+      val btcStats = client.stats.copy()
       val cacheDiff = if (oldStats != null) {
         cacheStats.minus(oldStats._1)
       } else cacheStats
