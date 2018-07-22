@@ -15,7 +15,7 @@ import scala.collection.mutable
   * @param client - Bitcoin client used for getting data
   */
 
-class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with Periodic[CacheStats] {
+class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with Periodic[(CacheStats,BitcoinClientStats)] {
 
   override val period: Int = 60000
 
@@ -82,11 +82,19 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     }
 
     //Print cache stats
-    occasionally( (oldStats:CacheStats)=> {
-      val stats = outputCache.stats()
-      val diff = if(oldStats != null) {stats.minus(oldStats)} else stats
-      logger.info(s"Cache stats: $diff")
-      stats
+    occasionally( oldStats => {
+      val cacheStats = outputCache.stats()
+      val btcStats = client.stats
+      val cacheDiff = if (oldStats != null) {
+        cacheStats.minus(oldStats._1)
+      } else cacheStats
+      val btcDiff = if (oldStats != null) {
+        btcStats.minus(oldStats._2)
+      } else btcStats
+      logger.info(s"Cache stats: $cacheDiff")
+      logger.info(s"Bitcoin client stats: $btcDiff")
+
+      (cacheStats, btcStats)
     })
 
     block

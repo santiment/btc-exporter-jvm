@@ -16,29 +16,69 @@ import scala.concurrent.{Await, Future}
 
 import scala.collection.JavaConverters._
 
+case class BitcoinClientStats
+(
+  var getBlock:Int = 0,
+  var getBlockTime:Long = 0L,
+  var getTx:Int = 0,
+  var getTxTime: Long = 0L,
+  var getTxList: Int = 0,
+  var getTxListTime: Long = 0L
+) {
+
+  def minus(other:BitcoinClientStats):BitcoinClientStats = BitcoinClientStats(
+    getBlock - other.getBlock,
+    getBlockTime - other.getBlockTime,
+    getTx - other.getTx,
+    getTxTime - other.getTxTime,
+    getTxList - other.getTxList,
+    getTxListTime - other.getTxListTime
+  )
+
+}
 
 class BitcoinClient(private val client:JsonRpcHttpClient)
 extends LazyLogging {
+
+  val stats: BitcoinClientStats = BitcoinClientStats()
 
   def getBlockHash(height:Integer):Sha256Hash = {
     client.invoke("getblockhash",Array(height),classOf[Sha256Hash])
   }
 
   def getBlock(height:Integer):Block = {
+    val start = System.nanoTime()
     val hash = getBlockHash(height)
     val serializedBlockString = client.invoke("getblock", Array(hash.toString,0), classOf[String])
+    val end = System.nanoTime()
     val serializedBlock = Utils.HEX.decode(serializedBlockString)
     val block = BitcoinClient.serializer.makeBlock(serializedBlock)
+
+    stats.getBlock += 1
+    stats.getBlockTime += (end-start)
 
     block
   }
 
-  def getTx(txHash:Sha256Hash):Transaction = {
-    val serialized = Utils.HEX.decode(
-      client.invoke("getrawtransaction", Array(txHash.toString,false), classOf[String])
-    )
+  def _getTx(txHash:Sha256Hash):Transaction = {
 
-    BitcoinClient.serializer.makeTransaction(serialized)
+    val response = client.invoke("getrawtransaction", Array(txHash.toString,false), classOf[String])
+    val serialized = Utils.HEX.decode(response)
+
+    val tx = BitcoinClient.serializer.makeTransaction(serialized)
+
+    tx
+  }
+
+  def getTx(txHash:Sha256Hash):Transaction = {
+
+    val start = System.nanoTime()
+    val tx = _getTx(txHash)
+    val end = System.nanoTime()
+    stats.getTx +=1
+    stats.getTxTime += (end-start)
+
+    tx
   }
 
   /**
@@ -47,13 +87,21 @@ extends LazyLogging {
     * @return - a map of transactions
     */
   def getTxList(hashes:collection.Set[Sha256Hash]):collection.Map[Sha256Hash, Transaction] = {
+
     val futures = hashes.map {
       hash => Future {
         (hash, getTx(hash))
       }
     }
 
+    val start = System.nanoTime()
+
     val result = Await.result(Future.sequence(futures), Duration.create(30, TimeUnit.SECONDS)).toMap[Sha256Hash, Transaction]
+
+    val end = System.nanoTime()
+    stats.getTxList += 1
+    stats.getTxListTime += (end-start)
+
     result
   }
 
