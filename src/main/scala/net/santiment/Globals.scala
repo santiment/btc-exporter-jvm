@@ -59,6 +59,8 @@ class Config {
 class Globals extends LazyLogging
 {
 
+  logger.debug("Initialising globals")
+
   lazy val config: Config = new Config()
 
   lazy val zk:CuratorFramework = makeZookeeperClient(config.zk)
@@ -76,18 +78,17 @@ class Globals extends LazyLogging
   lazy val lastCommittedHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastComittedPath)
   lazy val lastBlockStore: TransactionalStore[Int] = new SimpleTxStore[Int](lastWrittenHeightStore, lastCommittedHeightStore)
 
-
-
   lazy val producer:KafkaProducer[String, Array[Byte]] = makeKafkaProducer(config.kafka)
   lazy val sink:TransactionalSink[ResultTx] = new KafkaSink[ResultTx](producer, config.kafkaTopic)
 
   lazy val bitcoindJsonRpcClient: JsonRpcHttpClient = makeBitcoindJsonRpcClient(config.bitcoind)
+  lazy val bitcoindBatchJsonRpcClient: BatchJsonRPCClient = makeBitcoindBatchJsonRpcClient(config.bitcoind)
 
-  lazy val bitcoinClient:BitcoinClient = new BitcoinClient(bitcoindJsonRpcClient)
+  lazy val bitcoinClient:BitcoinClient = new BitcoinClient(bitcoindJsonRpcClient, bitcoindBatchJsonRpcClient)
   lazy val bitcoin = new BlockStore(bitcoinClient, config.numOutputsCached)
 
   def makeBitcoindJsonRpcClient(config:BitcoinClientConfig): JsonRpcHttpClient = {
-
+    logger.debug("Creating jsonrpc client")
     val url:URL = new URL(s"http://${config.host}:${config.port}")
     val authString = s"${config.username}:${config.password}"
 
@@ -103,6 +104,25 @@ class Globals extends LazyLogging
     new JsonRpcHttpClient(mapper, url, headers.asJava)
 
   }
+
+  def makeBitcoindBatchJsonRpcClient(config:BitcoinClientConfig): BatchJsonRPCClient = {
+    logger.debug("Creating batch jsonrpc client")
+    val url:URL = new URL(s"http://${config.host}:${config.port}")
+    val authString = s"${config.username}:${config.password}"
+
+    val encodedAuthString: String = Base64
+      .getEncoder
+      .encodeToString(
+        authString.getBytes(StandardCharsets.UTF_8))
+
+    val headers: Map[String, String] = Map[String,String](("Authorization",s"Basic $encodedAuthString"))
+
+    val mapper = new ObjectMapper()
+
+    new BatchJsonRPCClient(mapper, url, headers)
+
+  }
+
 
   def makeZookeeperClient(config:ZookeeperConfig):CuratorFramework = {
     logger.debug(s"Building Zookeeper client")

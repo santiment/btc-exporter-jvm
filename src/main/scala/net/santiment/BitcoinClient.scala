@@ -1,5 +1,6 @@
 package net.santiment
 
+import java.net.HttpURLConnection
 import java.util.Base64
 import java.util.concurrent.{ExecutionException, TimeUnit}
 
@@ -13,7 +14,6 @@ import org.bitcoinj.script.Script
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
-
 import scala.collection.JavaConverters._
 
 case class BitcoinClientStats
@@ -41,7 +41,8 @@ case class BitcoinClientStats
 
 }
 
-class BitcoinClient(private val client:JsonRpcHttpClient)
+class BitcoinClient(private val client:JsonRpcHttpClient,
+                    private val batchClient: BatchJsonRPCClient)
 extends LazyLogging {
 
   val stats: BitcoinClientStats = BitcoinClientStats()
@@ -92,17 +93,27 @@ extends LazyLogging {
     */
   def getTxList(hashes:collection.Set[Sha256Hash]):collection.Map[Sha256Hash, Transaction] = {
 
-    val futures = hashes.map {
-      hash => Future {
-        (hash, _getTx(hash))
-      }
+    val hashArray = hashes.toArray
+    val size = hashArray.length
+    val requests = for (hash<- hashArray) yield {
+      Array[Object](hash.toString, Predef.boolean2Boolean(false))
     }
 
     val start = System.nanoTime()
-
-    val result = Await.result(Future.sequence(futures), Duration.create(30, TimeUnit.SECONDS)).toMap[Sha256Hash, Transaction]
-
+    logger.debug("Invoking BatchRPC call")
+    val responseArray = batchClient.invoke[String]("getrawtransaction", requests, Map())
+    logger.debug("Result received")
     val end = System.nanoTime()
+
+    val resultArr = for (i <- 0 until size ) yield {
+      val serialized = Utils.HEX.decode(responseArray(i))
+      val tx = BitcoinClient.serializer.makeTransaction(serialized)
+      (hashArray(i), tx)
+    }
+
+    // `:_*` allows us to pass an array to a vararg function
+    val result = Map[Sha256Hash,Transaction](resultArr:_*)
+
     stats.getTxList += 1
     stats.getTxListTime += (end-start)
 
