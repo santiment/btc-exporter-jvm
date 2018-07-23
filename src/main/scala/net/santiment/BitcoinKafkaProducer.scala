@@ -86,6 +86,10 @@ class BitcoinKafkaProducer
 
     }
 
+    if (debits2.nonEmpty || credits2.nonEmpty) {
+      throw new IllegalStateException("Stacks don't match")
+    }
+
     result
   }
 
@@ -141,7 +145,7 @@ class BitcoinKafkaProducer
         throw new IllegalStateException("credit < debit")
       }
 
-      val feeDebit = TransactionEntry(BitcoinAddress(s"fee_${tx.getHashAsString}","virtual"),Coin.valueOf(fee))
+      val feeDebit = TransactionEntry(BitcoinAddress(s"fee","virtual"),Coin.valueOf(fee))
       blockFees -= fee
 
       debits = debits :+ feeDebit
@@ -167,7 +171,7 @@ class BitcoinKafkaProducer
     }
 
     val minerReward = cbDebits.map(_.value.getValue).sum
-    val minted = blockFees - minerReward //credit, i.e. negative
+    val minted = - (blockFees + minerReward) //credit, i.e. negative
     //Create two inputs -- fee and coinbase
     val cbCredits = mutable.Buffer[TransactionEntry](
       TransactionEntry(BitcoinAddress("fee", "virtual"), Coin.valueOf(blockFees)),
