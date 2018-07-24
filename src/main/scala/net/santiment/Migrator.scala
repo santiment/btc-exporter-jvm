@@ -43,7 +43,12 @@ class Migrations(kafka: AdminClient) {
     Migration(
       name = s"Create topic $topic",
       up = ()=> {
+        val  config = Map[String,String](
+          ("compression.type", "lz4")
+        )
         val t = new NewTopic(topic,numPartitions,replicationFactor)
+
+        t.configs(config.asJava)
         kafka.createTopics(Seq(t).asJava)
       },
 
@@ -52,7 +57,6 @@ class Migrations(kafka: AdminClient) {
       })
 
   val migrations:Array[Migration] = Array(
-    topicMigration("btc-tranfers-1",1,3),
     topicMigration("btc-transfers-1",1,3)
   )
 }
