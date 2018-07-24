@@ -25,6 +25,8 @@ class BitcoinKafkaProducer
   extends LazyLogging
 {
 
+  var sinkCommitted = false
+
   def modelTransfers(debits: Seq[TransactionEntry],
                      credits: Seq[TransactionEntry])
                     : j.List[(BitcoinAddress, BitcoinAddress,Coin)] = {
@@ -220,7 +222,12 @@ class BitcoinKafkaProducer
     //Update is better than write, since writes do reads to see if the object exists in Zookeeper
     lastBlock.update(height)
     try {
+      sinkCommitted = false
       sink.commit()
+      sinkCommitted = true
+      // If the process gets terminated here we will try to commit the last block to Zookeeper during shutdown
+      lastBlock.commit()
+      sinkCommitted = false
     } catch {
       case e:KafkaException =>
         logger.error(s"Exception while committing block $height")
@@ -230,12 +237,13 @@ class BitcoinKafkaProducer
         lastBlock.abort()
         throw e
       case e:Throwable =>
+        if(!sinkCommitted) {
+          lastBlock.abort()
+        }
         logger.error(s"Unhandled exception while committing block $height")
         throw e
     }
 
-    //Inform zk that the transaction has been committed successfully. Here the critical section ends
-    lastBlock.commit()
     result
   }
 
@@ -249,18 +257,15 @@ class BitcoinKafkaProducer
     logger.info(s"Starting BTC exporter ${BuildInfo.version}")
 
     world.migrator.up()
-/*
-    sys.addShutdownHook {
-      logger.info("Attempting graceful shutdown")
-      new Thread(()=>{
-        Thread.sleep(10000)
-        sys.exit(1)
-      }).start()
 
+    sys.addShutdownHook {
+      logger.error("Attempting graceful shutdown")
+      if(sinkCommitted) {
+        world.lastBlockStore.abort()
+      }
       world.closeEverythingQuietly()
-      sys.exit(0)
     }
-*/
+
 
 
     try {

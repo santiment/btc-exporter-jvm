@@ -5,6 +5,7 @@ ARG UID
 RUN useradd --uid $UID dev-user --create-home &&\
     mv /root/.sbt /home/dev-user/.sbt &&\
     chown --recursive dev-user /home/dev-user/.sbt &&\
+    chmod --recursive a+rwx /root &&\
     rm -rf /app &&\
     mkdir /app &&\
     chown dev-user /app
@@ -17,11 +18,11 @@ COPY --chown=dev-user project /app/project/
 
 COPY --chown=dev-user *.sbt .env /app/
 
-RUN env $(grep -v '^#' .env | xargs) sbt update
+RUN sbt update
 
 #COPY . /app/
 
 #RUN env $(grep -v '^#' .env | xargs) sbt update
 
 
-CMD env $(grep -v '^#' .env | xargs) sbt
+CMD sbt

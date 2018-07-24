@@ -8,3 +8,4 @@ Dockerfile
 Dockerfile-test
 Jenkinsfile
 docker-compose.yaml
+.env
