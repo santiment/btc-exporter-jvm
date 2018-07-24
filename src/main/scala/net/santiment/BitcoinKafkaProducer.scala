@@ -292,7 +292,7 @@ class BitcoinKafkaProducer
         txs += txProcess(height)
         blocks += 1
         var test = System.currentTimeMillis()
-        if (test - startTs > 10000) {
+        if (test - startTs > 60000) {
           logger.info(s"blocks=$blocks, txs=$txs, interval=${(test-startTs)/1000}s, last_block=$height")
           startTs = test
           blocks = 0
