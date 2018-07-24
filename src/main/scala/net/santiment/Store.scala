@@ -87,12 +87,18 @@ class ZookeeperStore[T](private val client:CuratorFramework, path:String)(implic
   override def read: Option[T] = {
 
     val start = System.nanoTime()
-    val result = if (client.checkExists.forPath(path) != null) {
+
+    //To optimize the normal path we first read and then check if the element exists
+    val result = try {
       val bytes = client.getData.forPath(path)
       Some(serde.fromByteArray(bytes))
-    }
-    else {
-      None
+    } catch {
+      case e:Exception =>
+        if(client.checkExists().forPath(path) == null) {
+          None
+        } else {
+          throw e
+        }
     }
 
     stats.getData += 1
