@@ -217,7 +217,8 @@ class BitcoinKafkaProducer
       * way which requires human intervention.
       */
 
-    lastBlock.write(Some(height))
+    //Update is better than write, since writes do reads to see if the object exists in Zookeeper
+    lastBlock.update(height)
     try {
       sink.commit()
     } catch {
@@ -264,9 +265,14 @@ class BitcoinKafkaProducer
 
     try {
       // Get last written block or 0 if none exist yet
+      if (world.lastBlockStore.read.isEmpty) {
+        //Since this operation is not a part of a transaction it will update both the write and commit store
+        world.lastBlockStore.create(0)
+      }
+
       val lastWritten: Int = world.lastBlockStore.read
-        .map(_.intValue)
-        .getOrElse(0)
+        .map(_.intValue).get
+
       logger.info(s"last_written_block=$lastWritten")
 
       //Fetch blocks until present

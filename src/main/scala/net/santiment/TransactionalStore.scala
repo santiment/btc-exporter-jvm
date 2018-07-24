@@ -23,17 +23,24 @@ extends TransactionalStore[T]
   }
 
   var last:Option[T] = _
+
+  var txWritten:Option[T] = None
+
   override def begin(): Unit = {
     if (last != null) {
       throw new IllegalStateException("Transaction already started.")
     }
     last = writeStore.read
+
+    txWritten = last
   }
 
   override def read: Option[T] = writeStore.read
 
   override def create(value:T): Unit = {
     writeStore.create(value)
+    txWritten = Some(value)
+
     if(last == null) {
       commitStore.create(value)
     }
@@ -41,6 +48,8 @@ extends TransactionalStore[T]
 
   override def update(value:T): Unit = {
     writeStore.update(value)
+    txWritten = Some(value)
+
     if(last == null) {
       commitStore.update(value)
     }
@@ -48,6 +57,9 @@ extends TransactionalStore[T]
 
   override def delete(): Unit = {
     writeStore.delete()
+
+    txWritten = None
+
     if(last == null) {
       commitStore.delete()
     }
@@ -55,6 +67,9 @@ extends TransactionalStore[T]
 
   override def write(value:Option[T]):Option[T] = {
     val result = writeStore.write(value)
+
+    txWritten = value
+
     if(last == null) {
       commitStore.write(value)
     }
@@ -65,7 +80,15 @@ extends TransactionalStore[T]
     if (last == null) {
       throw new IllegalStateException("Transaction not started")
     }
-    commitStore.write(writeStore.read)
+
+    if(txWritten.isEmpty && last.isDefined) {
+      commitStore.delete()
+    } else if (txWritten.isDefined && last.isEmpty) {
+      commitStore.create(txWritten.get)
+    } else if (txWritten.isDefined && last.isDefined) {
+      commitStore.update(txWritten.get)
+    }
+
     last = null
   }
 
@@ -75,5 +98,6 @@ extends TransactionalStore[T]
     }
     commitStore.write(last)
     last = null
+    txWritten = null
   }
 }
