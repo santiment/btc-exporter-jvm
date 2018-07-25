@@ -63,18 +63,12 @@ case class ZookeeperStats
 object ZookeeperStats extends LazyLogging {
   val stats = ZookeeperStats()
 
-  val timer = new Timer()
+  val timer = new Timer("ZookeeperStats", true)
 
   val task: TimerTask = new TimerTask {
 
     var oldStats = ZookeeperStats()
     override def run(): Unit = {
-      // The thread running the timer needs to be set as daemon thread so that the program
-      // can exit when the main thread finishes. Unfortunately the Timer API is not very good
-      // and we can only do that from inside the timer task. The next line needs to be run only
-      // once but it will run every time the task is called
-      Thread.currentThread().setDaemon(true)
-
       val diff = stats.minus(oldStats)
       logger.info(s"Zookeeper stats: $diff")
       oldStats = stats.copy()
