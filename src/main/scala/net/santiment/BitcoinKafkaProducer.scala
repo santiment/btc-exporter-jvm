@@ -112,6 +112,9 @@ class BitcoinKafkaProducer
     //Process all non-coinbase txs and calculate the fees
     for(tx:Transaction <- nonCoinbaseTxs.asScala) {
 
+      var totalDebit = 0L
+      var totalCredit = 0L
+
       //Get list of debits and credits
       var debits = for(output:TransactionOutput <- tx.getOutputs.asScala) yield {
 
@@ -125,6 +128,8 @@ class BitcoinKafkaProducer
         val account = for ( script <- scriptOpt ) yield BitcoinClient.extractAddress(script)
 
         val value:Coin = output.getValue
+
+        totalDebit += value.getValue
         TransactionEntry(account.getOrElse(BitcoinAddress.nullAddress),value)
       }
 
@@ -132,16 +137,16 @@ class BitcoinKafkaProducer
       val credits = for(input:TransactionInput <- tx.getInputs.asScala) yield {
         val output = world.bitcoin.getOutput(input)
 
-        val account = BitcoinClient.extractAddress(output.getScriptPubKey)
-        val value: Coin = output.getValue
+        val account = BitcoinClient.extractAddress(output.script)
+        val value: Coin = output.value
+
 
         //We store credits as negative values
+        totalCredit -= value.getValue
         TransactionEntry(account, value.negate())
       }
 
       //Compute fees. The fee for each non-coinbase tx is equal to the difference between the debits and the credits
-      val totalCredit = credits.map(_.value.getValue).sum //This value is negative
-      val totalDebit = debits.map(_.value.getValue).sum
       val fee = 0-(totalDebit + totalCredit)
       if(fee < 0) {
         throw new IllegalStateException("credit < debit")
@@ -166,6 +171,8 @@ class BitcoinKafkaProducer
     }
 
     //Process coinbase transaction
+    var minerReward = 0L
+
     val cbDebits = for(output:TransactionOutput <- coinbase.getOutputs.asScala) yield {
 
       //The following check is due to tx 59e7532c046ed825683306d6498d886209de02d412dd3f1dc55c55f87ea1c516
@@ -178,11 +185,13 @@ class BitcoinKafkaProducer
       val account = for ( script <- scriptOpt ) yield BitcoinClient.extractAddress(script)
 
       val value:Coin = output.getValue
+
+      minerReward += value.getValue
       TransactionEntry(account.getOrElse(BitcoinAddress.nullAddress),value)
     }
 
-    val minerReward = cbDebits.map(_.value.getValue).sum
     val minted = - (blockFees + minerReward) //credit, i.e. negative
+
     //Create two inputs -- fee and coinbase
     val cbCredits = mutable.Buffer[TransactionEntry](
       TransactionEntry(BitcoinAddress("fee", "virtual"), Coin.valueOf(blockFees)),

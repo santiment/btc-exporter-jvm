@@ -5,6 +5,7 @@ import java.{lang, util}
 import com.google.common.cache.{CacheBuilder, CacheLoader, CacheStats, LoadingCache}
 import com.typesafe.scalalogging.LazyLogging
 import org.bitcoinj.core._
+import org.bitcoinj.script.Script
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -25,21 +26,31 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     def fromOutpoint(o:TransactionOutPoint):OutputKey = OutputKey(o.getHash,o.getIndex)
   }
 
+  case class ParsedOutput(script:Script, value:Coin)
+
+  case class Output(script:Array[Byte], value:Long) {
+    def parse() : ParsedOutput  = ParsedOutput(new Script(script), Coin.valueOf(value))
+  }
+
+  object Output {
+    def fromTxOutput(out:TransactionOutput) : Output = Output(out.getScriptBytes, out.getValue.value)
+  }
+
   // Cache for storing tx outputs
-  val outputCache:LoadingCache[OutputKey,TransactionOutput] = CacheBuilder.newBuilder()
+  val outputCache:LoadingCache[OutputKey,Output] = CacheBuilder.newBuilder()
     .maximumSize(cacheSize)
     .initialCapacity(cacheSize)
     .recordStats()
-    .build(new CacheLoader[OutputKey, TransactionOutput] {
-      override def load(key: OutputKey): TransactionOutput = {
+    .build(new CacheLoader[OutputKey, Output] {
+      override def load(key: OutputKey): Output = {
         val tx = client.getTx(key.hash)
         val output = tx.getOutput(key.index)
         //Remove connection with parent tx to allow for gc
         output.setParent(null)
-        output
+        Output.fromTxOutput(output)
       }
 
-      override def loadAll(keys: lang.Iterable[_ <: OutputKey]): util.Map[OutputKey, TransactionOutput] = {
+      override def loadAll(keys: lang.Iterable[_ <: OutputKey]): util.Map[OutputKey, Output] = {
         val inputHashes = mutable.HashSet[Sha256Hash]()
 
         for( key<- keys.asScala ) {
@@ -48,11 +59,11 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
 
         //Get all parent transactions
         val parents:collection.Map[Sha256Hash,Transaction] = client.getTxList(inputHashes)
-        val result = new util.HashMap[OutputKey,TransactionOutput]()
+        val result = new util.HashMap[OutputKey,Output]()
         for (key <- keys.asScala) {
           val output = parents(key.hash).getOutput(key.index)
           output.setParent(null)
-          result.put(key,output)
+          result.put(key,Output.fromTxOutput(output))
         }
 
         result
@@ -76,7 +87,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
 
       for(out <- tx.getOutputs.asScala) {
         //Cache the output then remove connection with parent
-        outputCache.put(OutputKey(hash,out.getIndex),out)
+        outputCache.put(OutputKey(hash,out.getIndex),Output.fromTxOutput(out))
         out.setParent(null)
       }
     }
@@ -118,13 +129,13 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     }
   }
 
-  def getOutput(input:TransactionInput):TransactionOutput = {
+  def getOutput(input:TransactionInput):ParsedOutput = {
     val key = OutputKey.fromOutpoint(input.getOutpoint)
     logger.debug(s"get: $key")
 
     val output = outputCache.get(key)
     outputCache.invalidate(key)
-    output
+    output.parse()
   }
 
   def blockCount:Int = client.blockCount
