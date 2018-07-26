@@ -18,6 +18,8 @@ import scala.collection.mutable
 
 class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with Periodic[(CacheStats,BitcoinClientStats)] {
 
+  var invalidated = 0L
+
   /**
     * Fill the cache with outputs from old blocks
     * @param from
@@ -28,7 +30,6 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     var start = System.currentTimeMillis()
     var total = to - from + 1
     var done = 0
-    var invalidated = 0L
 
     for (height <- from.to(to) ) {
       //This will retrieve the block and put all of its outputs in the cache
@@ -39,7 +40,6 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
         for (input <- tx.getInputs.asScala) {
           if (!input.isCoinBase) {
             invalidateIfPresent(input)
-            invalidated += 1L
           }
         }
       }
@@ -138,9 +138,10 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
         btcStats.minus(oldStats._2)
       } else btcStats
       logger.info(s"Cache stats: $cacheDiff")
-      logger.info(s"Cache size: ${outputCache.size}")
+      logger.info(s"Cache size: ${outputCache.size}, invalidated: ${invalidated}")
       logger.info(s"Bitcoin client stats: $btcDiff")
 
+      invalidated = 0
       (cacheStats, btcStats)
     })
 
@@ -171,6 +172,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
 
     val output = outputCache.get(key)
     outputCache.invalidate(key)
+    invalidated += 1
     output.parse()
   }
 
@@ -180,6 +182,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     val output = outputCache.getIfPresent(key)
     if (output != null) {
       outputCache.invalidate(key)
+      invalidated += 1
     }
   }
 
