@@ -23,7 +23,8 @@ case class BitcoinClientStats
   var getTx:Int = 0,
   var getTxTime: Long = 0L,
   var getTxList: Int = 0,
-  var getTxListTime: Long = 0L
+  var getTxListTime: Long = 0L,
+  var getTxListSize: Long = 0L
 ) {
 
   def minus(other:BitcoinClientStats):BitcoinClientStats = BitcoinClientStats(
@@ -32,11 +33,12 @@ case class BitcoinClientStats
     getTx - other.getTx,
     getTxTime - other.getTxTime,
     getTxList - other.getTxList,
-    getTxListTime - other.getTxListTime
+    getTxListTime - other.getTxListTime,
+    getTxListSize - other.getTxListSize
   )
 
   override def toString: String = {
-    s"BitcoinClientStats(getBlock=$getBlock, getBlockTime=$getBlockTime, getTx=$getTx, getTxTime=$getTxTime, getTxList=$getTxList, getTxListTime=$getTxListTime)"
+    s"BitcoinClientStats(getBlock=$getBlock, getBlockTime=$getBlockTime, getTx=$getTx, getTxTime=$getTxTime, getTxList=$getTxList, getTxListTime=$getTxListTime, getTxListSize=$getTxListSize)"
   }
 
 }
@@ -116,6 +118,7 @@ extends LazyLogging {
 
     stats.getTxList += 1
     stats.getTxListTime += (end-start)
+    stats.getTxListSize += size
 
     result
   }

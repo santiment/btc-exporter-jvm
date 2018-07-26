@@ -138,6 +138,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
         btcStats.minus(oldStats._2)
       } else btcStats
       logger.info(s"Cache stats: $cacheDiff")
+      logger.info(s"Cache size: ${outputCache.size}")
       logger.info(s"Bitcoin client stats: $btcDiff")
 
       (cacheStats, btcStats)
