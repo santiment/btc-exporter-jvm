@@ -51,6 +51,8 @@ class Config {
   lazy val zkNextMigrationToCleanPath = "/migration/nextToDestroy"
 
   lazy val numOutputsCached: Int = sys.env.getOrElse("NUM_OUTPUTS_CACHED","1000").toInt
+  lazy val precache :Int = sys.env.getOrElse("NUM_PRECACHED_BLOCKS", "0").toInt
+
 }
 
 /**

@@ -302,6 +302,13 @@ class BitcoinKafkaProducer
       val lastToBeWritten = world.bitcoin.blockCount - world.config.confirmations
       logger.info(s"first_block_to_fetch=${lastWritten+1}, last_block_to_fetch=$lastToBeWritten")
 
+      if (world.config.precache > 0) {
+        val from = Math.max(1, lastWritten - world.config.precache)
+        logger.info(s"Precaching outputs from blocks $from - $lastWritten")
+        world.bitcoin.precacheBlocks(from, lastWritten)
+        logger.info(s"Precaching finished")
+      }
+
       var startTs = System.currentTimeMillis()
       var blocks = 0
       var txs = 0

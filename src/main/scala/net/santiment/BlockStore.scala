@@ -18,6 +18,40 @@ import scala.collection.mutable
 
 class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with Periodic[(CacheStats,BitcoinClientStats)] {
 
+  /**
+    * Fill the cache with outputs from old blocks
+    * @param from
+    * @param to
+    */
+  def precacheBlocks(from: Int, to: Int): Unit = {
+
+    var start = System.currentTimeMillis()
+    var total = to - from + 1
+    var done = 0
+    var invalidated = 0L
+
+    for (height <- from.to(to) ) {
+      //This will retrieve the block and put all of its outputs in the cache
+      val block = getBlock(height)
+
+      //We will look if the block's inputs are already in the cache, and if so -- we'll remove them
+      for (tx <- block.getTransactions.asScala) {
+        for (input <- tx.getInputs.asScala) {
+          if (!input.isCoinBase) {
+            invalidateIfPresent(input)
+            invalidated += 1L
+          }
+        }
+      }
+      done += 1
+      val time = System.currentTimeMillis()
+      if (time-start > 60000) {
+        logger.info(s"Cached $done out of $total blocks. Cache size: ${outputCache.size()}, invalidated: $invalidated")
+      }
+    }
+
+  }
+
   override val period: Int = 60000
 
   case class OutputKey(hash:Sha256Hash, index:Long)
@@ -136,6 +170,15 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
     val output = outputCache.get(key)
     outputCache.invalidate(key)
     output.parse()
+  }
+
+  def invalidateIfPresent(input:TransactionInput):Unit = {
+    val key = OutputKey.fromOutpoint(input.getOutpoint)
+
+    val output = outputCache.getIfPresent(key)
+    if (output != null) {
+      outputCache.invalidate(key)
+    }
   }
 
   def blockCount:Int = client.blockCount
