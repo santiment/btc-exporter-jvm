@@ -137,8 +137,8 @@ class BitcoinKafkaProducer
       val credits = for(input:TransactionInput <- tx.getInputs.asScala) yield {
         val output = world.bitcoin.getOutput(input)
 
-        val account = BitcoinClient.extractAddress(output.getScriptPubKey)
-        val value: Coin = output.getValue
+        val account = BitcoinClient.extractAddress(output.script)
+        val value: Coin = output.value
 
 
         //We store credits as negative values
