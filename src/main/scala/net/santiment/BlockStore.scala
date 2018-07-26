@@ -46,7 +46,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
       done += 1
       val time = System.currentTimeMillis()
       if (time-start > 60000) {
-        logger.info(s"Cached $done out of $total blocks. Cache size: ${outputCache.size()}, invalidated: $invalidated")
+        logger.info(s"Cached $done out of $total blocks.")
         start = time
       }
     }
