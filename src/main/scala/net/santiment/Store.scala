@@ -63,7 +63,7 @@ case class ZookeeperStats
 object ZookeeperStats extends LazyLogging {
   val stats = ZookeeperStats()
 
-  val timer = new Timer()
+  val timer = new Timer("ZookeeperStats", true)
 
   val task: TimerTask = new TimerTask {
 

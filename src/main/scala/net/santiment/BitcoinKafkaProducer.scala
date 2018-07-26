@@ -174,11 +174,20 @@ class BitcoinKafkaProducer
     var minerReward = 0L
 
     val cbDebits = for(output:TransactionOutput <- coinbase.getOutputs.asScala) yield {
-      val account = BitcoinClient.extractAddress(output.getScriptPubKey)
+
+      //The following check is due to tx 59e7532c046ed825683306d6498d886209de02d412dd3f1dc55c55f87ea1c516
+      val scriptOpt = try {
+        Some(output.getScriptPubKey)
+      } catch {
+        case e:ScriptException => None
+      }
+
+      val account = for ( script <- scriptOpt ) yield BitcoinClient.extractAddress(script)
+
       val value:Coin = output.getValue
 
       minerReward += value.getValue
-      TransactionEntry(account,value)
+      TransactionEntry(account.getOrElse(BitcoinAddress.nullAddress),value)
     }
 
     val minted = - (blockFees + minerReward) //credit, i.e. negative
