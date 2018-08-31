@@ -24,5 +24,4 @@ RUN sbt update
 
 #RUN env $(grep -v '^#' .env | xargs) sbt update
 
-
 CMD sbt

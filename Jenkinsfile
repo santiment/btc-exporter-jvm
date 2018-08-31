@@ -41,9 +41,9 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
           ]) {
             def awsRegistry = "${env.aws_account_id}.dkr.ecr.eu-central-1.amazonaws.com"
             docker.withRegistry("https://${awsRegistry}", "ecr:eu-central-1:ecr-credentials") {
-              sh "docker build -t ${awsRegistry}/btc-exporter-jvm:${env.BRANCH_NAME} -t ${awsRegistry}/btc-exporter-jvm:${scmVars.GIT_COMMIT} ."
-              sh "docker push ${awsRegistry}/btc-exporter-jvm:${env.BRANCH_NAME}"
-              sh "docker push ${awsRegistry}/btc-exporter-jvm:${scmVars.GIT_COMMIT}"
+              sh "docker build --target rawexporter -t ${awsRegistry}/btc-exporter-jvm:raw-exporter-${env.BRANCH_NAME} -t ${awsRegistry}/btc-exporter-jvm:raw-exporter-${scmVars.GIT_COMMIT} ."
+              sh "docker push ${awsRegistry}/btc-exporter-jvm:raw-exporter-${env.BRANCH_NAME}"
+              sh "docker push ${awsRegistry}/btc-exporter-jvm:raw-exporter-${scmVars.GIT_COMMIT}"
             }
           }
         }

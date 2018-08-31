@@ -36,4 +36,4 @@ services:
       BITCOIND_PORT: 8332
       BITCOIND_USER: 
       BITCOIND_PASSWORD:
-      KAFKA_TOPIC: btc-transfers
+
