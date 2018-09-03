@@ -35,7 +35,7 @@ class BitcoinKafkaProducer
 
     //Process the current block and send the resulting records to Kafka
     processor(height)
-    sink.flush()
+    //sink.flush()
 
     /**
       * Here starts the critical section for committing the data. First we record that all records have been sent to kafka, by updating
