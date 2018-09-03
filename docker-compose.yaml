@@ -30,7 +30,7 @@ services:
       - --bootstrap-server
       - kafka:9092
       - --topic
-      - btc-transfers-1
+      - btc-raw-blocks
       - --from-beginning
 
   sbt:
@@ -58,7 +58,6 @@ services:
       BITCOIND_PORT: 8332
       BITCOIND_USER: 
       BITCOIND_PASSWORD:
-      KAFKA_TOPIC: btc-transfers
 
 volumes:
   kafka_data:

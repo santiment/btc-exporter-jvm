@@ -63,10 +63,12 @@ put in the environment.
 
 ## Building
 
+(OUTDATED)
+
 To build the final docker image use
 
 ``` sh
-$ docker build -t localhst/btc-exporter-jvm .
+$ docker build --target rawexporter -t localhst/btc-exporter-jvm .
 ```
 
 This will build the image and publish it locally.
@@ -79,6 +81,8 @@ integration tests. The tests are run using the docker-compose file
 be set-up during the integration tests
 
 ## Operations
+
+(OUTDATED)
 
 This program reads Bitcoin blocks from the `bitcoind` server and
 writes data to Kafka. It uses Zookeeper to keep track of the last
