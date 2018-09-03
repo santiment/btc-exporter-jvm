@@ -69,7 +69,7 @@ lazy val rawexporter = (project in file("raw-exporter"))
     //Don't run tests during assembly
     test in assembly := {},
 
-    assemblyJarName in assembly := name.value.concat(".jar"),
+    assemblyJarName in assembly := "raw-exporter.jar",
 
     assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(defaultUniversalScript(shebang = true)))
 )
