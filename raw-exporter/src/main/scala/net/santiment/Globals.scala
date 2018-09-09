@@ -34,7 +34,7 @@ class Config {
 
   lazy val zk = ZookeeperConfig(
     connectionString = sys.env.getOrElse("ZOOKEEPER_URL", "localhost:2181"),
-    namespace = s"${BuildInfo.name}",
+    namespace = s"${BuildInfo.name}"
   )
 
   lazy val kafkaTopic = "btc-raw-blocks"

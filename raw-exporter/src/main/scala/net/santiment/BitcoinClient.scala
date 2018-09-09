@@ -19,12 +19,12 @@ import scala.collection.JavaConverters._
 case class BitcoinClientStats
 (
   var getRawBlock:Int = 0,
-  var getRawBlockTime:Long = 0L,
+  var getRawBlockTime:Long = 0L
 ) {
 
   def minus(other:BitcoinClientStats):BitcoinClientStats = BitcoinClientStats(
     getRawBlock - other.getRawBlock,
-    getRawBlockTime - other.getRawBlockTime,
+    getRawBlockTime - other.getRawBlockTime
   )
 
   override def toString: String = {

@@ -23,7 +23,7 @@ case class KafkaStats
   var send:Long = 0l,
   var sendTime: Long = 0l,
   var flush:Long=0L,
-  var flushTime: Long = 0L,
+  var flushTime: Long = 0L
 ) {
   def minus(other:KafkaStats):KafkaStats = KafkaStats(
     begin - other.begin,
