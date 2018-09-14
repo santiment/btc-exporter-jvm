@@ -1,124 +1,13 @@
-package net.santiment
+package net.santiment.btc
 
-import java.util.Base64
-
-import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
 import org.bitcoinj.core._
 import org.bitcoinj.params.MainNetParams
 import org.bitcoinj.script.Script
+import java.util.Base64
 
-case class BitcoinClientStats
-(
-  var getBlock:Int = 0,
-  var getBlockTime:Long = 0L,
-  var getTx:Int = 0,
-  var getTxTime: Long = 0L,
-  var getTxList: Int = 0,
-  var getTxListTime: Long = 0L,
-  var getTxListSize: Long = 0L
-) {
+import net.santiment.btc.blockprocessor.ByteArray
 
-  def minus(other:BitcoinClientStats):BitcoinClientStats = BitcoinClientStats(
-    getBlock - other.getBlock,
-    getBlockTime - other.getBlockTime,
-    getTx - other.getTx,
-    getTxTime - other.getTxTime,
-    getTxList - other.getTxList,
-    getTxListTime - other.getTxListTime,
-    getTxListSize - other.getTxListSize
-  )
-
-  override def toString: String = {
-    s"BitcoinClientStats(getBlock=$getBlock, getBlockTime=$getBlockTime, getTx=$getTx, getTxTime=$getTxTime, getTxList=$getTxList, getTxListTime=$getTxListTime, getTxListSize=$getTxListSize)"
-  }
-
-}
-
-class BitcoinClient(private val client:JsonRpcHttpClient,
-                    private val batchClient: BatchJsonRPCClient)
-extends LazyLogging {
-
-  val stats: BitcoinClientStats = BitcoinClientStats()
-
-  def getBlockHash(height:Integer):Sha256Hash = {
-    client.invoke("getblockhash",Array(height),classOf[Sha256Hash])
-  }
-
-  def getBlock(height:Integer):Block = {
-    val start = System.nanoTime()
-    val hash = getBlockHash(height)
-    val serializedBlockString = client.invoke("getblock", Array(hash.toString,0), classOf[String])
-    val end = System.nanoTime()
-    val serializedBlock = Utils.HEX.decode(serializedBlockString)
-    val block = BitcoinClient.serializer.makeBlock(serializedBlock)
-
-    stats.getBlock += 1
-    stats.getBlockTime += (end-start)
-
-    block
-  }
-
-  def _getTx(txHash:Sha256Hash):Transaction = {
-
-    val response = client.invoke("getrawtransaction", Array(txHash.toString,false), classOf[String])
-    val serialized = Utils.HEX.decode(response)
-
-    val tx = BitcoinClient.serializer.makeTransaction(serialized)
-
-    tx
-  }
-
-  def getTx(txHash:Sha256Hash):Transaction = {
-
-    val start = System.nanoTime()
-    val tx = _getTx(txHash)
-    val end = System.nanoTime()
-    stats.getTx +=1
-    stats.getTxTime += (end-start)
-
-    tx
-  }
-
-  /**
-    * Returns the transactions corresponding to a list of hashes. Can be implemented using batching JSON calls in theory.
-    * @param hashes - the list of hashes
-    * @return - a map of transactions
-    */
-  def getTxList(hashes:collection.Set[Sha256Hash]):collection.Map[Sha256Hash, Transaction] = {
-
-    val hashArray = hashes.toArray
-    val size = hashArray.length
-    val requests = for (hash<- hashArray) yield {
-      Array[Object](hash.toString, Predef.boolean2Boolean(false))
-    }
-
-    val start = System.nanoTime()
-    logger.debug("Invoking BatchRPC call")
-    val responseArray = batchClient.invoke[String]("getrawtransaction", requests, Map())
-    logger.debug("Result received")
-    val end = System.nanoTime()
-
-    val resultArr = for (i <- 0 until size ) yield {
-      val serialized = Utils.HEX.decode(responseArray(i))
-      val tx = BitcoinClient.serializer.makeTransaction(serialized)
-      (hashArray(i), tx)
-    }
-
-    // `:_*` allows us to pass an array to a vararg function
-    val result = Map[Sha256Hash,Transaction](resultArr:_*)
-
-    stats.getTxList += 1
-    stats.getTxListTime += (end-start)
-    stats.getTxListSize += size
-
-    result
-  }
-
-  def blockCount:Int = {
-    client.invoke("getblockcount", Array(), classOf[Int])
-  }
-}
 
 case class BitcoinAddress(address:String, kind:String)
 
@@ -137,9 +26,7 @@ object BitcoinClient extends LazyLogging {
 
   val serializer = new BitcoinSerializer(mainNetParams,false)
 
-  /**
-    * Copied from the master branch of bitcoinj. Unfortunately it is not released yet
-    */
+  def toBlock(bytes: ByteArray): Block = serializer.makeBlock(bytes)
 
   def extractAddress(scriptPubKey:Script):BitcoinAddress = scriptPubKey match {
 
@@ -177,7 +64,7 @@ object BitcoinClient extends LazyLogging {
       val fullData = new Array[Byte](1+data.length)
       System.arraycopy(data,0,fullData,1,data.length)
       fullData(0)=0 //The current witness version
-      val addr = Bech32.encode("bc",fullData)
+    val addr = Bech32.encode("bc",fullData)
 
       //4.1 P2WPKH
       if(ScriptPattern.isPayToWitnessPubKeyHash(script)) BitcoinAddress(addr, "P2WPKH")

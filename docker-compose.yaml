@@ -58,6 +58,8 @@ services:
       BITCOIND_PORT: 8332
       BITCOIND_USER: 
       BITCOIND_PASSWORD:
+      CHECKPOINT_DATA_URI: file:///app/output/checkpoints
+    
 
 volumes:
   kafka_data:

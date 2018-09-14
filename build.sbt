@@ -10,6 +10,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / resolvers  ++=Seq(
   "Apache Development Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots/",
   Resolver.mavenLocal
+
 )
 
 
@@ -99,14 +100,14 @@ lazy val blockprocessor = (project in file("block-processor"))
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", xs @ _*) => MergeStrategy.discard
       case _ => MergeStrategy.first
-    }
+    },
 
+    // make run command include the provided dependencies
+    run in Compile := Defaults.runTask(fullClasspath in Compile,
+      mainClass in (Compile, run),
+      runner in (Compile,run)).evaluated
   )
 
-// make run command include the provided dependencies
-run in Compile := Defaults.runTask(fullClasspath in Compile,
-  mainClass in (Compile, run),
-  runner in (Compile,run)).evaluated
 
 
 
