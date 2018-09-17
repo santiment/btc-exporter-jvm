@@ -1,4 +1,4 @@
-package net.santiment
+package net.santiment.util
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.nio.ByteBuffer

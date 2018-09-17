@@ -5,9 +5,8 @@ import org.scalatest.{FunSuite, Outcome}
 import org.scalatest.concurrent.TimeLimitedTests
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
-
 import Globals._
-import Store.IntSerde
+import net.santiment.util.{Store, ZookeeperStore}
 
 class ZookeeperStoreSpec
   extends FunSuite

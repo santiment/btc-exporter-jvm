@@ -19,6 +19,7 @@ cancelable in Global := true
 
 
 lazy val oldexporter = (project in file("old-exporter"))
+  .dependsOn(util)
   .enablePlugins(BuildInfoPlugin)
   .configs(IntegrationTest)
   .settings(
@@ -49,7 +50,30 @@ lazy val oldexporter = (project in file("old-exporter"))
     assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(defaultUniversalScript(shebang = true)))
   )
 
+lazy val util = (project in file("util"))
+  .enablePlugins(BuildInfoPlugin)
+  .configs(IntegrationTest)
+  .settings(
+    Defaults.itSettings,
+
+    name := "btc-util",
+
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+
+    buildInfoPackage := organization.value,
+
+    //Don't run tests during assembly
+    test in assembly := {},
+
+    libraryDependencies ++= Seq (
+      scalaLogging,
+      kafka,
+      zookeeper
+    ) ++ curatorLibs
+  )
+
 lazy val rawexporter = (project in file("raw-exporter"))
+  .dependsOn(util)
   .enablePlugins(BuildInfoPlugin)
   .configs(IntegrationTest)
   .settings(
@@ -81,6 +105,7 @@ lazy val rawexporter = (project in file("raw-exporter"))
 )
 
 lazy val blockprocessor = (project in file("block-processor"))
+  .dependsOn(util)
   .enablePlugins(BuildInfoPlugin)
   .configs(IntegrationTest)
   .settings(
@@ -89,12 +114,18 @@ lazy val blockprocessor = (project in file("block-processor"))
 
     libraryDependencies ++= flinkDependencies
       ++ logging
+      ++ jackson
       ++ Seq(
       scalaTest % s"${Test.name},${IntegrationTest.name}",
       bitcoinj
     ),
 
     scalacOptions ++= Seq("-target:jvm-1.8", "-unchecked", "-deprecation", "-feature"),
+
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+
+    buildInfoPackage := organization.value,
+
 
     //exclude Scala library from assembly
     assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),

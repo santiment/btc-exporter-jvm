@@ -1,7 +1,9 @@
 package net.santiment.btc
 
 import com.typesafe.scalalogging.LazyLogging
-import net.santiment.btc.blockprocessor.{BlockProcessorFlatMap, Globals, RawBlock}
+import net.santiment.btc.blockprocessor.{AccountChange, BlockProcessorFlatMap, Globals, RawBlock}
+import net.santiment.util.Migrator
+import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
 
 import scala.language.reflectiveCalls
@@ -9,17 +11,24 @@ import scala.language.reflectiveCalls
 class BlockProcessor
 (
   context: {
+    val migrator: Migrator
     val env: StreamExecutionEnvironment
     val rawBlockSource: DataStream[RawBlock]
+    val transfersSink: SinkFunction[AccountChange]
   }
 )
   extends LazyLogging
 {
   def main(args: Array[String]): Unit = {
 
+    context.migrator.up()
+    
     val processed = context.rawBlockSource
       .keyBy(_ =>())
       .flatMap(new BlockProcessorFlatMap())
+
+    processed.addSink(context.transfersSink)
+
     processed.print()
     context.env.execute("btc-block-processor")
   }

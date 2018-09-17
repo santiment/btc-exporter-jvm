@@ -9,6 +9,8 @@ import collection.JavaConverters._
 import scala.collection.mutable
 import java.{util => j}
 
+import net.santiment.util.Migrator
+
 import scala.concurrent.Future
 
 class BitcoinKafkaProducer

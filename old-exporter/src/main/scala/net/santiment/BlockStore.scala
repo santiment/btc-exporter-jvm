@@ -1,6 +1,7 @@
 package net.santiment
 
-import java.{lang, util}
+import java.lang
+import java.{util => ju}
 
 import com.google.common.cache.{CacheBuilder, CacheLoader, CacheStats, LoadingCache}
 import com.typesafe.scalalogging.LazyLogging
@@ -85,7 +86,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
         Output.fromTxOutput(output)
       }
 
-      override def loadAll(keys: lang.Iterable[_ <: OutputKey]): util.Map[OutputKey, Output] = {
+      override def loadAll(keys: lang.Iterable[_ <: OutputKey]): ju.Map[OutputKey, Output] = {
         val inputHashes = mutable.HashSet[Sha256Hash]()
 
         for( key<- keys.asScala ) {
@@ -94,7 +95,7 @@ class BlockStore(client:BitcoinClient, cacheSize:Int) extends LazyLogging with P
 
         //Get all parent transactions
         val parents:collection.Map[Sha256Hash,Transaction] = client.getTxList(inputHashes)
-        val result = new util.HashMap[OutputKey,Output]()
+        val result = new ju.HashMap[OutputKey,Output]()
         for (key <- keys.asScala) {
           val output = parents(key.hash).getOutput(key.index)
           output.setParent(null)

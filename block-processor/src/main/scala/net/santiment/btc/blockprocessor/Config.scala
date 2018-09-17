@@ -2,11 +2,22 @@ package net.santiment.btc.blockprocessor
 
 import java.time.Duration
 
+import net.santiment.BuildInfo
+
 case class KafkaTopicConfig
 (
   bootstrapServers: String,
   topic: String
 )
+
+case class MigrationConfig
+(
+  connectionString: String,
+  namespace: String,
+  nextMigrationPath: String,
+  nextMigrationToCleanPath: String
+)
+
 
 case class FlinkConfig
 (
@@ -52,7 +63,15 @@ class Config {
   )
 
   lazy val transfersTopic = KafkaTopicConfig(
-    sys.env.getOrElse("KAFKA_TRANSFERS_URL", sys.env("KAFKA_URL")),
+    sys.env.getOrElse("KAFKA_TRANSFERS_URL", sys.env.getOrElse("KAFKA_URL","localhost:9092")),
     sys.env.getOrElse("KAFKA_TRANSFERS_TOPIC", "btc-transfers")
   )
+
+  lazy val migrations = MigrationConfig(
+    connectionString = sys.env.getOrElse("ZOOKEEPER_URL", "localhost:2181"),
+    namespace = s"${BuildInfo.name}",
+    nextMigrationPath = "/migration/next",
+    nextMigrationToCleanPath = "/migration/nextToDestroy"
+  )
+
 }

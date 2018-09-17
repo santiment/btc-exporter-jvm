@@ -1,5 +1,7 @@
 package net.santiment
 
+import net.santiment.util.Store
+
 trait Transactional {
   def begin():Unit
   def commit():Unit

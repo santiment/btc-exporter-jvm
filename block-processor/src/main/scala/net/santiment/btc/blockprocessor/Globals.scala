@@ -1,9 +1,15 @@
 package net.santiment.btc.blockprocessor
 
+import java.nio.charset.StandardCharsets
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.typesafe.scalalogging.LazyLogging
+import net.santiment.util.{MigrationUtil, Migrator, Store, ZookeeperStore}
+import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
+import org.apache.curator.retry.ExponentialBackoffRetry
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
@@ -12,9 +18,14 @@ import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedCheckpointCleanup
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
+import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer011
-import org.apache.flink.streaming.util.serialization.KeyedDeserializationSchema
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer011.Semantic
+import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer011, FlinkKafkaProducer011}
+import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema, KeyedSerializationSchema}
+import org.apache.kafka.clients.admin.AdminClient
+import net.santiment.util.Store._
+
 
 import scala.util.hashing.MurmurHash3
 
@@ -22,6 +33,48 @@ object Globals
   extends LazyLogging {
 
   lazy val config = new Config()
+
+  //Migration stuff
+  lazy val zk:CuratorFramework = makeZookeeperClient(config.migrations)
+
+  def makeZookeeperClient(config:MigrationConfig):CuratorFramework = {
+    logger.debug(s"Building Zookeeper client")
+
+    val retryPolicy = new ExponentialBackoffRetry(1000, 10)
+
+    val client = CuratorFrameworkFactory.builder()
+      .namespace(config.namespace)
+      .connectString(config.connectionString)
+      .retryPolicy(retryPolicy)
+      .build()
+
+    logger.debug(s"Connecting to Zookeeper at ${config.connectionString}")
+    client.start()
+    logger.debug(s"Blocking until connected")
+    client.blockUntilConnected()
+    logger.info(s"Connected to Zookeeper at ${config.connectionString}. Namespace: ${config.namespace}")
+    client
+  }
+
+
+  lazy val transfersAdminClient: AdminClient = makeKafkaAdminClient(config.transfersTopic)
+
+  def makeKafkaAdminClient(config:KafkaTopicConfig):AdminClient = {
+    val properties = new Properties()
+    properties.put("bootstrap.servers", config.bootstrapServers)
+    AdminClient.create(properties)
+  }
+
+  //Migration store data
+  lazy val nextMigrationStore: Store[Int] = new ZookeeperStore[Int](zk, config.migrations.nextMigrationPath)
+  lazy val nextMigrationToCleanStore: Store[Int] = new ZookeeperStore[Int](zk, config.migrations.nextMigrationToCleanPath)
+
+  lazy val migrations = Array(
+    MigrationUtil.topicMigration(transfersAdminClient, config.transfersTopic.topic,1,1)
+  )
+
+  lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
+
 
   lazy val stateBackend: StateBackend = makeRocksDBStateBackend(config.flink.checkpointDataURI)
 
@@ -110,6 +163,43 @@ object Globals
 
     val uid = s"raw-blocks-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
     env.addSource(source).uid(uid).setParallelism(1)
+  }
+
+  lazy val transfersSink:SinkFunction[AccountChange]  = makeTransfersKafkaSink(env, config.transfersTopic)
+
+
+  def makeTransfersKafkaSink(env: StreamExecutionEnvironment, config: KafkaTopicConfig): FlinkKafkaProducer011[AccountChange]
+  = {
+    logger.info(s"Connecting transfers sink to ${config.bootstrapServers}, topic: ${config.topic}")
+    val properties = new Properties()
+
+    properties.setProperty("bootstrap.servers", config.bootstrapServers)
+    properties.setProperty("acks", "all")
+
+    //Write compressed batches to kafka
+    properties.put("compression.type", "lz4")
+
+
+    val serializationSchema: KeyedSerializationSchema[AccountChange] = new KeyedSerializationSchema[AccountChange] {
+
+      lazy val objectMapper: ObjectMapper = {
+        val result = new ObjectMapper()
+        result.registerModule(DefaultScalaModule)
+        result
+      }
+
+      override def serializeKey(element: AccountChange): Array[Byte] = element.address.getBytes(StandardCharsets.UTF_8)
+
+      override def serializeValue(element: AccountChange): Array[Byte] = {
+        objectMapper.writeValueAsBytes(element)
+      }
+
+      override def getTargetTopic(element: AccountChange): String = {
+        config.topic
+      }
+    }
+
+    new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties,Semantic.EXACTLY_ONCE)
   }
 
 }

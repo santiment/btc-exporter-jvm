@@ -1,6 +1,7 @@
 package net.santiment
 
 import com.typesafe.scalalogging.LazyLogging
+import net.santiment.util.Migrator
 import org.apache.kafka.common.KafkaException
 
 class BitcoinKafkaProducer
