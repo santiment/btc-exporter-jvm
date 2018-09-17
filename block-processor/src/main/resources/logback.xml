@@ -6,7 +6,7 @@
     </appender>
 
 
-    <logger name="net.santiment" level="info"/>
+    <logger name="net.santiment" level="debug"/>
     <root level="warn">
         <appender-ref ref="STDOUT" />
     </root>

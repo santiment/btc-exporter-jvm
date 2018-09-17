@@ -12,7 +12,6 @@ import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedCheckpointCleanup
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
-import org.apache.flink.streaming.api.functions.source.SourceFunction
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer011
 import org.apache.flink.streaming.util.serialization.KeyedDeserializationSchema
@@ -110,7 +109,7 @@ object Globals
     // will restart by itself from the beginning even if the job is started from a savepoint
 
     val uid = s"raw-blocks-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
-    env.addSource(source).uid(uid)
+    env.addSource(source).uid(uid).setParallelism(1)
   }
 
 }

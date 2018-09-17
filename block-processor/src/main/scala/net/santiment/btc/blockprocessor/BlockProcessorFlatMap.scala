@@ -1,30 +1,35 @@
 package net.santiment.btc.blockprocessor
 
+import com.typesafe.scalalogging.LazyLogging
 import net.santiment.btc.{BitcoinAddress, BitcoinClient}
 import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
+import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.streaming.api.scala._
 import org.apache.flink.util.Collector
 import org.bitcoinj.core._
 import org.bitcoinj.script.Script
 
 import collection.JavaConverters._
 
-class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]() {
+class BlockProcessorFlatMap
+  extends RichFlatMapFunction[RawBlock, AccountChange]()
+    with LazyLogging {
 
   /**
     * Key for the state
     * @param hash
     * @param index
     */
-  case class OutputKey(hash: Sha256Hash, index: Long)
+  case class OutputKey(hash: ByteArray, index: Long)
 
   object OutputKey {
-    def fromOutpoint(o:TransactionOutPoint):OutputKey = OutputKey(o.getHash,o.getIndex)
+    def fromOutpoint(o:TransactionOutPoint):OutputKey = OutputKey(o.getHash.getBytes,o.getIndex)
   }
 
   case class ParsedOutput(script:Script, value:Coin)
 
-  case class Output(script:Array[Byte], value:Long) {
+  case class Output(script:ByteArray, value:Long) {
     def parse() : ParsedOutput  = ParsedOutput(new Script(script), Coin.valueOf(value))
   }
 
@@ -33,10 +38,14 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
   }
 
   val stateDescriptor = new MapStateDescriptor[OutputKey, Output](
-    "utxo", classOf[OutputKey], classOf[Output])
+    "utxo", implicitly[TypeInformation[OutputKey]], implicitly[TypeInformation[Output]])
 
-  lazy val state: MapState[OutputKey, Output] = getRuntimeContext
-    .getMapState(stateDescriptor)
+  lazy val state: MapState[OutputKey, Output] = {
+    val result = getRuntimeContext
+      .getMapState(stateDescriptor)
+    logger.trace("State connected")
+    result
+  }
 
   def spend(o:TransactionOutPoint):ParsedOutput = {
     val key = OutputKey.fromOutpoint(o)
@@ -47,7 +56,9 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
 
   def storeOutput(txOut:TransactionOutput):Unit = {
     val key = OutputKey.fromOutpoint(txOut.getOutPointFor)
+
     state.put(key, Output.fromTxOutput(txOut))
+    logger.trace("stored")
   }
 
 
@@ -82,7 +93,7 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
     * @param out
     */
   override def flatMap(value: RawBlock, out: Collector[AccountChange]): Unit = {
-
+    logger.trace(s"Processing block ${value.height}")
     // 1. Deserialize block
 
     val block = BitcoinClient.toBlock(value.bytes)
@@ -97,6 +108,7 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
     var minerReward = 0L
     var blockFees = 0L
 
+    logger.trace(s"Processing coinbase tx")
     coinbase._1.getOutputs.asScala.zipWithIndex.foreach { case (output, index) =>
 
       //The following check is due to tx 59e7532c046ed825683306d6498d886209de02d412dd3f1dc55c55f87ea1c516
@@ -112,8 +124,10 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
 
       minerReward += value.getValue
 
+      logger.trace("storing")
       storeOutput(output)
 
+      logger.trace("emitting")
       out.collect(AccountChange(
         in = false, // debit
         ts = block.getTimeSeconds,
@@ -127,6 +141,7 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
 
 
     //3. Process non-coinbase transactions
+    logger.trace(s"Processing non-coinbase txs")
     txs.tail.foreach { case (tx, txPos) =>
 
       var totalDebit = 0L
@@ -139,8 +154,7 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
         val account = BitcoinClient.extractAddress(output.script)
         val value: Coin = output.value
 
-        //We store credits as negative values
-        totalCredit -= value.getValue
+        totalCredit += value.getValue
 
         out.collect(AccountChange(
           in = true, // credit
@@ -190,6 +204,7 @@ class BlockProcessorFlatMap extends RichFlatMapFunction[RawBlock, AccountChange]
     }
 
     //4. Emit coinbase account change - equal to number of minted coins
+    logger.trace("Processing fees")
     val coinbaseCredit = Coin.valueOf(minerReward - blockFees)
 
     out.collect(AccountChange(

@@ -2,7 +2,6 @@ package net.santiment.btc
 
 import com.typesafe.scalalogging.LazyLogging
 import net.santiment.btc.blockprocessor.{BlockProcessorFlatMap, Globals, RawBlock}
-import org.apache.flink.streaming.api.functions.source.SourceFunction
 import org.apache.flink.streaming.api.scala._
 
 import scala.language.reflectiveCalls
@@ -19,7 +18,7 @@ class BlockProcessor
   def main(args: Array[String]): Unit = {
 
     val processed = context.rawBlockSource
-      .keyBy(_ =>null)
+      .keyBy(_ =>())
       .flatMap(new BlockProcessorFlatMap())
     processed.print()
     context.env.execute("btc-block-processor")

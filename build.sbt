@@ -13,6 +13,10 @@ ThisBuild / resolvers  ++=Seq(
 
 )
 
+ThisBuild / fork := true
+
+cancelable in Global := true
+
 
 lazy val oldexporter = (project in file("old-exporter"))
   .enablePlugins(BuildInfoPlugin)
