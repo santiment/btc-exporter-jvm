@@ -70,7 +70,7 @@ object Globals
   lazy val nextMigrationToCleanStore: Store[Int] = new ZookeeperStore[Int](zk, config.migrations.nextMigrationToCleanPath)
 
   lazy val migrations = Array(
-    MigrationUtil.topicMigration(transfersAdminClient, config.transfersTopic.topic,1,1)
+    MigrationUtil.compactTopicMigration(transfersAdminClient, config.transfersTopic.topic,1,1)
   )
 
   lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
@@ -188,7 +188,10 @@ object Globals
         result
       }
 
-      override def serializeKey(element: AccountChange): Array[Byte] = element.address.getBytes(StandardCharsets.UTF_8)
+      override def serializeKey(element: AccountChange): Array[Byte] = {
+        //Make a unique key for each record so that we can compact the topic
+        s"${element.height}-${element.txPos}-${if(element.in) "in" else "out"}-${element.index}".getBytes(StandardCharsets.UTF_8)
+      }
 
       override def serializeValue(element: AccountChange): Array[Byte] = {
         objectMapper.writeValueAsBytes(element)
@@ -199,7 +202,7 @@ object Globals
       }
     }
 
-    new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties,Semantic.EXACTLY_ONCE)
+    new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties, Semantic.EXACTLY_ONCE)
   }
 
 }

@@ -22,14 +22,18 @@ class BlockProcessor
   def main(args: Array[String]): Unit = {
 
     context.migrator.up()
-    
+
+    //This job is not parallel
+    context.env.setParallelism(1)
+
     val processed = context.rawBlockSource
       .keyBy(_ =>())
       .flatMap(new BlockProcessorFlatMap())
+      .uid("block-processor-flatmap")
 
-    processed.addSink(context.transfersSink)
+    processed.addSink(context.transfersSink).uid("transfers-kafka-sink")
 
-    processed.print()
+    //processed.print()
     context.env.execute("btc-block-processor")
   }
 }

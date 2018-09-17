@@ -22,4 +22,24 @@ object MigrationUtil {
         kafka.deleteTopics(Seq(topic).asJava)
       })
 
+  def compactTopicMigration(kafka: AdminClient, topic:String, numPartitions:Int, replicationFactor:Short): Migration =
+    Migration(
+      name = s"Create topic $topic",
+      up = ()=> {
+        val  config = Map[String,String](
+          ("compression.type", "lz4"),
+          ("log.cleanup.policy", "compact")
+        )
+
+        val t = new NewTopic(topic,numPartitions,replicationFactor)
+
+        t.configs(config.asJava)
+        kafka.createTopics(Seq(t).asJava)
+      },
+
+      clean = ()=>{
+        kafka.deleteTopics(Seq(topic).asJava)
+      })
+
+
 }
