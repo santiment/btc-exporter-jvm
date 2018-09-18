@@ -138,6 +138,10 @@ object Globals
     properties.setProperty("enable.auto.commit", "false")
     properties.setProperty("auto.offset.reset", "earliest")
 
+    //We use transactions
+    properties.setProperty("isolation.level", "read_committed")
+
+
     val deserializationSchema: KeyedDeserializationSchema[RawBlock] = new KeyedDeserializationSchema[RawBlock] {
       override def deserialize(messageKey: Array[Byte], message: Array[Byte], topic: String, partition: Int, offset: Long): RawBlock = {
         RawBlock(new String(messageKey).toInt, message.clone())
@@ -165,10 +169,10 @@ object Globals
     env.addSource(source).uid(uid).setParallelism(1)
   }
 
-  lazy val transfersSink:SinkFunction[AccountChange]  = makeTransfersKafkaSink(env, config.transfersTopic)
+  lazy val consumeTransfers:DataStream[AccountChange]=>Unit = makeTransfersKafkaSink(config.transfersTopic)
 
 
-  def makeTransfersKafkaSink(env: StreamExecutionEnvironment, config: KafkaTopicConfig): FlinkKafkaProducer011[AccountChange]
+  def makeTransfersKafkaSink(config: KafkaTopicConfig): DataStream[AccountChange]=>Unit
   = {
     logger.info(s"Connecting transfers sink to ${config.bootstrapServers}, topic: ${config.topic}")
     val properties = new Properties()
@@ -202,7 +206,15 @@ object Globals
       }
     }
 
-    new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties, Semantic.EXACTLY_ONCE)
+    val producer = new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties, Semantic.EXACTLY_ONCE)
+    producer.setWriteTimestampToKafka(true)
+
+    // We create a uid based on the name of the kafka topic. In this way if we change the topic any old saved state will
+    // not affect the new processing
+    val uid = s"btc-transfers-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
+
+    stream=>stream.addSink(producer).uid(uid)
+
   }
 
 }

@@ -40,7 +40,7 @@ lazy val oldexporter = (project in file("old-exporter"))
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 
-    buildInfoPackage := organization.value,
+    buildInfoPackage := "net.santiment.btc.oldexporter",
 
     //Don't run tests during assembly
     test in assembly := {},
@@ -60,7 +60,7 @@ lazy val util = (project in file("util"))
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 
-    buildInfoPackage := organization.value,
+    buildInfoPackage := "net.santiment.btc.util",
 
     //Don't run tests during assembly
     test in assembly := {},
@@ -94,7 +94,7 @@ lazy val rawexporter = (project in file("raw-exporter"))
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 
-    buildInfoPackage := organization.value,
+    buildInfoPackage := "net.santiment.btc.rawexporter",
 
     //Don't run tests during assembly
     test in assembly := {},
@@ -124,7 +124,7 @@ lazy val blockprocessor = (project in file("block-processor"))
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 
-    buildInfoPackage := organization.value,
+    buildInfoPackage := "net.santiment.btc.blockprocessor",
 
 
     //exclude Scala library from assembly

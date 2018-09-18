@@ -2,8 +2,6 @@ package net.santiment.btc.blockprocessor
 
 import java.time.Duration
 
-import net.santiment.BuildInfo
-
 case class KafkaTopicConfig
 (
   bootstrapServers: String,

@@ -7,6 +7,7 @@ import java.util.{Base64, Properties}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
+import net.santiment.btc.oldexporter.BuildInfo
 import net.santiment.util.{MigrationUtil, Migrator, Store, ZookeeperStore}
 import net.santiment.util.Store._
 import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}

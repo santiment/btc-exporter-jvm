@@ -7,7 +7,8 @@ import java.util.{Base64, Properties}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
-import net.santiment.util.{Migrator, Store, ZookeeperStore,MigrationUtil}
+import net.santiment.btc.rawexporter.BuildInfo
+import net.santiment.util.{MigrationUtil, Migrator, Store, ZookeeperStore}
 import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.ExponentialBackoffRetry
 import org.apache.kafka.clients.consumer.KafkaConsumer
