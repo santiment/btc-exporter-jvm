@@ -8,3 +8,6 @@ Dockerfile*
 Jenkinsfile
 docker-compose.yaml
 .env*
+*/target
+output/
+tmp/

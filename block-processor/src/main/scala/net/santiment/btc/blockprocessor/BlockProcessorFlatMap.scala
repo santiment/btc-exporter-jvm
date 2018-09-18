@@ -5,6 +5,7 @@ import net.santiment.btc.{BitcoinAddress, BitcoinClient}
 import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.util.Collector
 import org.bitcoinj.core._
@@ -37,15 +38,18 @@ class BlockProcessorFlatMap
     def fromTxOutput(out:TransactionOutput) : Output = Output(out.getScriptBytes, out.getValue.value)
   }
 
-  val stateDescriptor = new MapStateDescriptor[OutputKey, Output](
+  @transient private var state:MapState[OutputKey, Output] = _
+
+  override def open(parameters: Configuration): Unit = {
+    super.open(parameters)
+
+    val stateDescriptor = new MapStateDescriptor[OutputKey, Output](
     "utxo", implicitly[TypeInformation[OutputKey]], implicitly[TypeInformation[Output]])
 
-  lazy val state: MapState[OutputKey, Output] = {
-    val result = getRuntimeContext
-      .getMapState(stateDescriptor)
-    logger.trace("State connected")
-    result
+    state = getRuntimeContext.getMapState(stateDescriptor)
+    logger.trace("Connected")
   }
+
 
   def spend(o:TransactionOutPoint):ParsedOutput = {
     val key = OutputKey.fromOutpoint(o)
@@ -60,6 +64,8 @@ class BlockProcessorFlatMap
     state.put(key, Output.fromTxOutput(txOut))
     logger.trace("stored")
   }
+
+
 
 
   /**

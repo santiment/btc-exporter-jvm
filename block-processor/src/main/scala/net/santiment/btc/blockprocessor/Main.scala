@@ -1,13 +1,10 @@
-package net.santiment.btc
+package net.santiment.btc.blockprocessor
 
 import com.typesafe.scalalogging.LazyLogging
-import net.santiment.btc.blockprocessor.{AccountChange, BlockProcessorFlatMap, Globals, RawBlock}
 import net.santiment.util.Migrator
 import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
-import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.watermark.Watermark
-
-import scala.language.reflectiveCalls
 
 class BlockProcessor
 (
@@ -61,5 +58,5 @@ class BlockProcessor
   }
 }
 
-object App extends BlockProcessor(Globals) {}
+object Main extends BlockProcessor(Globals) {}
 

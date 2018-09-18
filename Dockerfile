@@ -73,11 +73,15 @@ RUN set -ex; \
      $FLINK_HOME/opt/flink-metrics-prometheus-$FLINK_VERSION.jar \
      $FLINK_HOME/opt/flink-table_2.11-$FLINK_VERSION.jar \
      $FLINK_HOME/lib; \
-  chmod a+x /docker-entrypoint.sh
+  chmod a+x /docker-entrypoint.sh; \
+  mkdir -p /tmp; chown -R flink:flink /tmp; \
+  mkdir -p /output; chown -R flink:flink /output
+
 
 COPY --chown=flink:flink block-processor/lib/* $FLINK_HOME/lib/
 
 COPY --from=builder --chown=flink:flink /app/block-processor/target/scala-2.11/block-processor.jar $FLINK_HOME/lib/job.jar
+
 
 USER flink
 ENTRYPOINT ["/docker-entrypoint.sh"]
