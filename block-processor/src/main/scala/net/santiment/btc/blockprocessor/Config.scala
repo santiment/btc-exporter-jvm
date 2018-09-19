@@ -2,6 +2,8 @@ package net.santiment.btc.blockprocessor
 
 import java.time.Duration
 
+import org.apache.flink.api.java.utils.ParameterTool
+
 case class KafkaTopicConfig
 (
   bootstrapServers: String,
@@ -30,43 +32,53 @@ case class FlinkConfig
 )
 
 
-class Config {
+class Config(args:Array[String]) {
+
+  val props: ParameterTool = ParameterTool.fromArgs(args)
+
+  def getO(env:String, default:String=null): Option[String] = {
+    val prop = env.toLowerCase.replace('_','.')
+    Option(props.get(prop))
+      .orElse(sys.env.get(env))
+      .orElse(Option(default))
+  }
+
+  def get(env:String, default:String = null):String = getO(env,default).get
 
   val flink = FlinkConfig(
-    checkpointDataURI = sys.env("CHECKPOINT_DATA_URI"),
 
-    checkpointInterval = Duration.ofMillis(sys.env.getOrElse("CHECKPOINT_INTERVAL_MS", "1800000").toLong),
+    checkpointDataURI = get("CHECKPOINT_DATA_URI"),
 
-    checkpointTimeout = Duration.ofMillis(sys.env.getOrElse("CHECKPOINT_TIMEOUT_MS", "3600000").toLong),
+    checkpointInterval = Duration.ofMillis(get("CHECKPOINT_INTERVAL_MS","1800000").toLong),
 
-    minPauseBetweenCheckpoints = Duration.ofMillis(sys.env.getOrElse("MIN_PAUSE_BETWEEN_CHECKPOINTS",   "600000").toLong),
+    checkpointTimeout = Duration.ofMillis(get("CHECKPOINT_TIMEOUT_MS", "3600000").toLong),
+
+    minPauseBetweenCheckpoints = Duration.ofMillis(get("MIN_PAUSE_BETWEEN_CHECKPOINTS",   "600000").toLong),
 
     externalizedCheckpointsEnabled = true,
 
-    maxNumberOfRestartsInInterval = sys.env.get("MAX_NUMBER_OF_RESTARTS_IN_INTERVAL")
-        .map(_.toInt)
-        .getOrElse(5),
+    maxNumberOfRestartsInInterval = get("MAX_NUMBER_OF_RESTARTS_IN_INTERVAL","5").toInt,
 
     restartsInterval = Duration.ofSeconds(
-      sys.env.getOrElse("RESTARTS_INTERVAL_S","3600").toInt),
+      get("RESTARTS_INTERVAL_S","3600").toInt),
 
     delayBetweenRestarts = Duration.ofSeconds(
-      sys.env.getOrElse("DELAY_BETWEEN_RESTARTS_S","300").toInt)
+      get("DELAY_BETWEEN_RESTARTS_S","300").toInt)
   )
 
   lazy val rawBlockTopic = KafkaTopicConfig(
     //We support different Kafka clusters for the input and output topics in this way
-    sys.env.getOrElse("KAFKA_RAW_BLOCK_URL", sys.env("KAFKA_URL")),
-    sys.env.getOrElse("KAFKA_RAW_BLOCK_TOPIC", "btc-raw-blocks")
+    getO("KAFKA_RAW_BLOCK_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
+    get("KAFKA_RAW_BLOCK_TOPIC", "btc-raw-blocks")
   )
 
   lazy val transfersTopic = KafkaTopicConfig(
-    sys.env.getOrElse("KAFKA_TRANSFERS_URL", sys.env.getOrElse("KAFKA_URL","localhost:9092")),
-    sys.env.getOrElse("KAFKA_TRANSFERS_TOPIC", "btc-transfers")
+    getO("KAFKA_TRANSFERS_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
+    get("KAFKA_TRANSFERS_TOPIC", "btc-transfers")
   )
 
   lazy val migrations = MigrationConfig(
-    connectionString = sys.env.getOrElse("ZOOKEEPER_URL", "localhost:2181"),
+    connectionString = get("ZOOKEEPER_URL", "localhost:2181"),
     namespace = s"${BuildInfo.name}",
     nextMigrationPath = "/migration/next",
     nextMigrationToCleanPath = "/migration/nextToDestroy"

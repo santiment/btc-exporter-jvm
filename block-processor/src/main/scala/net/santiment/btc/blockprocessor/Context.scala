@@ -29,10 +29,10 @@ import net.santiment.util.Store._
 
 import scala.util.hashing.MurmurHash3
 
-object Globals
+class Context(args:Array[String])
   extends LazyLogging {
 
-  lazy val config = new Config()
+  lazy val config = new Config(args)
 
   //Migration stuff
   lazy val zk:CuratorFramework = makeZookeeperClient(config.migrations)
@@ -206,7 +206,7 @@ object Globals
       }
     }
 
-    val producer = new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties, Semantic.EXACTLY_ONCE)
+    val producer = new FlinkKafkaProducer011[AccountChange](config.topic, serializationSchema,properties, Semantic.AT_LEAST_ONCE)
     producer.setWriteTimestampToKafka(true)
 
     // We create a uid based on the name of the kafka topic. In this way if we change the topic any old saved state will

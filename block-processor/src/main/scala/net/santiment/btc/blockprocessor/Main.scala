@@ -8,24 +8,21 @@ import org.apache.flink.streaming.api.watermark.Watermark
 
 class BlockProcessor
 (
-  context: {
-    val migrator: Migrator
-    val env: StreamExecutionEnvironment
-    val rawBlockSource: DataStream[RawBlock]
-    val consumeTransfers: DataStream[AccountChange]=>Unit
-  }
+  var context:Option[Context] = None
 )
   extends LazyLogging
 {
   def main(args: Array[String]): Unit = {
 
+    val ctx = context.getOrElse(new Context(args))
+
     //Create kafka topic for storing btc transfers if not already created
-    context.migrator.up()
+    ctx.migrator.up()
 
     //This job is not parallel
-    context.env.setParallelism(1)
+    ctx.env.setParallelism(1)
 
-    val processed = context.rawBlockSource
+    val processed = ctx.rawBlockSource
       // Dummy key which allows us to use keyed map state
       .keyBy(_ =>())
 
@@ -51,12 +48,12 @@ class BlockProcessor
         })
 
     //Send to the kafka sink
-    context.consumeTransfers(processed)
+    ctx.consumeTransfers(processed)
 
     //processed.print()
-    context.env.execute("btc-block-processor")
+    ctx.env.execute("btc-block-processor")
   }
 }
 
-object Main extends BlockProcessor(Globals) {}
+object Main extends BlockProcessor() {}
 
