@@ -13,7 +13,7 @@ import org.apache.curator.retry.ExponentialBackoffRetry
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
-import org.apache.flink.contrib.streaming.state.{PredefinedOptions, RocksDBStateBackend}
+import org.apache.flink.contrib.streaming.state.{OptionsFactory, PredefinedOptions, RocksDBStateBackend}
 import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedCheckpointCleanup
@@ -25,7 +25,7 @@ import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer011, Flink
 import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema, KeyedSerializationSchema}
 import org.apache.kafka.clients.admin.AdminClient
 import net.santiment.util.Store._
-
+import org.rocksdb.{ColumnFamilyOptions, DBOptions}
 
 import scala.util.hashing.MurmurHash3
 
@@ -80,7 +80,30 @@ class Context(args:Array[String])
 
   def makeRocksDBStateBackend(checkpointURI: String): StateBackend = {
     val result = new RocksDBStateBackend(checkpointURI, true)
+
     result.setPredefinedOptions(PredefinedOptions.FLASH_SSD_OPTIMIZED)
+
+    result.setOptions( new OptionsFactory {
+      override def createDBOptions(currentOptions: DBOptions): DBOptions = {
+        //Those are the predefined FLASH_SSD_OPTIMIZED options
+        new DBOptions()
+          .setIncreaseParallelism(8)
+          .setUseFsync(false)
+          .setMaxOpenFiles(-1)
+
+
+      }
+
+      override def createColumnOptions(currentOptions: ColumnFamilyOptions): ColumnFamilyOptions = {
+        new ColumnFamilyOptions()
+          .optimizeForPointLookup(4096)
+          .setMaxWriteBufferNumber(5) //default 2
+          .setMinWriteBufferNumberToMerge(2) //default 1
+          .setOptimizeFiltersForHits(true)
+          .setWriteBufferSize(64 * 1024 * 1024) //64MB, default is 4MB
+      }
+    })
+
     result
   }
 
