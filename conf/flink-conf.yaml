@@ -244,3 +244,5 @@ io.tmp.dirs: /tmp
 # Interval in milliseconds for refreshing the monitored directories.
 #historyserver.archive.fs.refresh-interval: 10000
 
+
+blob.server.port: 6124

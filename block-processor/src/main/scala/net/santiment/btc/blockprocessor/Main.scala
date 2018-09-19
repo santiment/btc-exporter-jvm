@@ -2,6 +2,7 @@ package net.santiment.btc.blockprocessor
 
 import com.typesafe.scalalogging.LazyLogging
 import net.santiment.util.Migrator
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.watermark.Watermark
@@ -27,7 +28,7 @@ class BlockProcessor
       .keyBy(_ =>())
 
       // Extract account changes
-      .flatMap(new BlockProcessorFlatMap())
+      .flatMap(new BlockProcessorFlatMap())(implicitly[TypeInformation[AccountChange]])
       .uid("block-processor-flatmap")
 
       // Assign timestamps and watermarks. The timestamps will be recorded in the kafka topic
