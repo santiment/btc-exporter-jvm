@@ -25,7 +25,7 @@ import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer011, Flink
 import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema, KeyedSerializationSchema}
 import org.apache.kafka.clients.admin.AdminClient
 import net.santiment.util.Store._
-import org.rocksdb.{ColumnFamilyOptions, DBOptions}
+import org.rocksdb.{BlockBasedTableConfig, BloomFilter, ColumnFamilyOptions, DBOptions}
 
 import scala.util.hashing.MurmurHash3
 
@@ -96,11 +96,16 @@ class Context(args:Array[String])
 
       override def createColumnOptions(currentOptions: ColumnFamilyOptions): ColumnFamilyOptions = {
         new ColumnFamilyOptions()
-          .optimizeForPointLookup(4096)
+          .optimizeForPointLookup(2048)
           .setMaxWriteBufferNumber(5) //default 2
           .setMinWriteBufferNumberToMerge(2) //default 1
           .setOptimizeFiltersForHits(true)
           .setWriteBufferSize(64 * 1024 * 1024) //64MB, default is 4MB
+          .setTableFormatConfig(
+          new BlockBasedTableConfig()
+            .setBlockCacheSize(2048*1024*1024)
+            .setFilter( new BloomFilter()) //bloom filters are apparently needed for reducing reads
+        )
       }
     })
 
