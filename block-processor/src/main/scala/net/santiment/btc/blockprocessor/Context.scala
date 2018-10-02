@@ -90,8 +90,6 @@ class Context(args:Array[String])
           .setIncreaseParallelism(8)
           .setUseFsync(false)
           .setMaxOpenFiles(-1)
-
-
       }
 
       override def createColumnOptions(currentOptions: ColumnFamilyOptions): ColumnFamilyOptions = {
