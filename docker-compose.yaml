@@ -38,6 +38,21 @@ services:
       - "isolation.level=read_committed"
       - --from-beginning
 
+  clickhouse:
+    image: yandex/clickhouse-server
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      - zookeeper
+      - kafka
+
+  clickhouse-client:
+    image: yandex/clickhouse-client
+    depends_on:
+      - clickhouse
+    command: ["--host", "clickhouse"]
+
   sbt:
     build:
       context: .
@@ -57,7 +72,7 @@ services:
       
     environment:
       KAFKA_URL: kafka:9092
-      KAFKA_RAW_BLOCK_URL: kafka:9092
+      KAFKA_RAW_BLOCK_URL: 
       KAFKA_TRANSFERS_URL: kafka:9092
       ZOOKEEPER_URL: zookeeper:2181
       START_BLOCK: 52500
@@ -126,6 +141,7 @@ services:
       
 
     command: "task-manager"
+
     
 
 volumes:
