@@ -31,10 +31,21 @@ case class FlinkConfig
   delayBetweenRestarts: Duration
 )
 
+sealed trait RocksDBProfile
+case object CurrentJob extends RocksDBProfile {}
+case class HistoricalJob
+(
+  blockCacheSizeMb: Long,
+  parallelism: Int,
+  writeBufferSizeMb: Long,
+  maxWriteBufferNumber: Int,
+  minWriteBufferNumberToMerge: Int
+) extends RocksDBProfile {}
+
 
 class Config(args:Array[String]) {
 
-  val props: ParameterTool = ParameterTool.fromArgs(args)
+  lazy val props: ParameterTool = ParameterTool.fromArgs(args)
 
   def getO(env:String, default:String=null): Option[String] = {
     val prop = env.toLowerCase.replace('_','.')
@@ -45,7 +56,7 @@ class Config(args:Array[String]) {
 
   def get(env:String, default:String = null):String = getO(env,default).get
 
-  val flink = FlinkConfig(
+  lazy val flink = FlinkConfig(
 
     checkpointDataURI = get("CHECKPOINT_DATA_URI"),
 
@@ -83,5 +94,18 @@ class Config(args:Array[String]) {
     nextMigrationPath = "/migration/next",
     nextMigrationToCleanPath = "/migration/nextToDestroy"
   )
+
+  lazy val profile: RocksDBProfile = get("ROCKSDB_PROFILE","current") match {
+    case "current" => CurrentJob
+    case "historical" => HistoricalJob(
+      get("ROCKSDB_BLOCK_CACHE_SIZE_MB","4096").toLong,
+      get("ROCKSDB_PARALLELISM", "8").toInt,
+      get("ROCKSDB_WRITE_BUFFER_SIZE_MB","256").toLong,
+      get("ROCKSDB_MAX_WRITE_BUFFER_NUMBER", "5").toInt,
+      get("ROCKSDB_MIN_WRITE_BUFFER_NUMBER_TO_MERGE","2").toInt
+    )
+    case x =>
+      throw new IllegalArgumentException(s"Unknown profile: $x")
+  }
 
 }
