@@ -1,12 +1,13 @@
 package net.santiment
 
 import com.typesafe.scalalogging.LazyLogging
-import org.scalatest.{FunSuite, Outcome}
+import net.santiment.Globals._
+import net.santiment.util.{Store, ZookeeperStore}
+import org.scalatest.FunSuite
 import org.scalatest.concurrent.TimeLimitedTests
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
-import Globals._
-import net.santiment.util.{Store, ZookeeperStore}
+import net.santiment.util.Store.IntSerde
 
 class ZookeeperStoreSpec
   extends FunSuite
