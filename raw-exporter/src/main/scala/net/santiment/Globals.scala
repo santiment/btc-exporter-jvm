@@ -73,7 +73,7 @@ class Globals extends LazyLogging
   lazy val nextMigrationToCleanStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkNextMigrationToCleanPath)
 
   lazy val migrations = Array(
-    MigrationUtil.topicMigration(adminClient, "btc-raw-blocks",1,3)
+    MigrationUtil.topicMigration(adminClient, "btc-raw-blocks",1,1)
   )
 
   lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
