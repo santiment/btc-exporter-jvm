@@ -57,7 +57,7 @@ CMD /app/raw-exporter.jar
 #
 ################################################################################
 
-FROM flink:1.6.0-scala_2.11 AS blockprocessor
+FROM flink:1.6.1-scala_2.11 AS blockprocessor
 
 COPY --chown=0 docker-flink-entrypoint.sh /docker-entrypoint.sh
 
