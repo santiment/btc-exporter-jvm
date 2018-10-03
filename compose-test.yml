@@ -26,7 +26,7 @@ services:
       - zookeeper
       - kafka
 
-    command: sbt test it:test
+    command: sh -c "cat /app/raw-exporter/src/it/scala/net/santiment/ZookeeperStoreSpec.scala && sbt test it:test"
 
     environment:
       KAFKA_URL: kafka:9092
