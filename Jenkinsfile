@@ -24,6 +24,8 @@ podTemplate(label: 'btc-exporter-jvm-builder', containers: [
           )
         ]) {
           try {
+            sh "docker-compose -f compose-test.yml build test"
+
             sh "docker-compose -f compose-test.yml run test"
           } finally {
             sh "docker-compose -f compose-test.yml down -v"

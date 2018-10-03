@@ -1,20 +1,12 @@
 package net.santiment
 
-import java.net.HttpURLConnection
 import java.util.Base64
-import java.util.concurrent.{ExecutionException, TimeUnit}
 
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
 import org.bitcoinj.core._
 import org.bitcoinj.params.MainNetParams
 import org.bitcoinj.script.Script
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
-import scala.collection.JavaConverters._
 
 case class BitcoinClientStats
 (

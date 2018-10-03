@@ -1,8 +1,10 @@
 import sbt._
 
 object Dependencies {
+  lazy val SCALA_VERSION = "2.11.8"
   lazy val KAFKA_VERSION = "1.1.0" //sys.env("KAFKA_VERSION")
   lazy val ZOOKEEPER_VERSION = "3.4.12" //sys.env("ZOOKEEPER_VERSION")
+  lazy val FLINK_VERSION = "1.6.0"
 
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.0.5"
 
@@ -43,5 +45,38 @@ object Dependencies {
     "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6"
   )
+
+  lazy val flinkDependencies = Seq(
+  "org.apache.flink" %% "flink-scala" % FLINK_VERSION % "provided"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-streaming-scala" % FLINK_VERSION % "provided"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-connector-filesystem" % FLINK_VERSION % "provided"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-statebackend-rocksdb" % FLINK_VERSION % "provided"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-queryable-state-runtime" % FLINK_VERSION % "provided"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-streaming-java" % FLINK_VERSION % "it,test" classifier "tests"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-runtime" % FLINK_VERSION % "it,test" classifier "tests"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-streaming-java" % FLINK_VERSION % "it,test"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-runtime" % FLINK_VERSION % "it,test"
+    exclude("log4j", "log4j")
+    exclude("org.slf4j", "slf4j-log4j12"),
+  "org.apache.flink" %% "flink-connector-kafka-0.11" % FLINK_VERSION
+)
+
+// ScalaTest
 
 }

@@ -1,4 +1,4 @@
-version: '3'
+version: '3.4'
 services:
   zookeeper:
     image: wurstmeister/zookeeper
@@ -13,6 +13,7 @@ services:
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_TRANSACTION_MAX_TIMEOUT_MS: 7200000
     depends_on:
       - zookeeper
     #volumes:
@@ -21,7 +22,7 @@ services:
     #    driver: none
 
   consumer:
-    image: wurstmeister/kafka:2.11-1.1.0
+    image: wurstmeister/kafka
     depends_on:
       - zookeeper
       - kafka
@@ -30,8 +31,27 @@ services:
       - --bootstrap-server
       - kafka:9092
       - --topic
-      - btc-raw-blocks
+      - "${TOPIC}"
+      - --property
+      - "print.key=true"
+      - --property
+      - "isolation.level=read_committed"
       - --from-beginning
+
+  clickhouse:
+    image: yandex/clickhouse-server
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      - zookeeper
+      - kafka
+
+  clickhouse-client:
+    image: yandex/clickhouse-client
+    depends_on:
+      - clickhouse
+    command: ["--host", "clickhouse"]
 
   sbt:
     build:
@@ -52,12 +72,77 @@ services:
       
     environment:
       KAFKA_URL: kafka:9092
+      KAFKA_RAW_BLOCK_URL: 
+      KAFKA_TRANSFERS_URL: kafka:9092
       ZOOKEEPER_URL: zookeeper:2181
       START_BLOCK: 52500
-      BITCOIND_URL: bitcoind
+      BITCOIND_URL: 
       BITCOIND_PORT: 8332
       BITCOIND_USER: 
       BITCOIND_PASSWORD:
+      CHECKPOINT_DATA_URI: file:///app/output/checkpoints
+
+  rawexporter:
+    build:
+      context: .
+      target: rawexporter
+
+    depends_on:
+      - zookeeper
+      - kafka
+
+    environment:
+      KAFKA_URL: kafka:9092
+      ZOOKEEPER_URL: zookeeper:2181
+      BITCOIND_URL:
+      BITCOIND_PORT: 8332
+      BITCOIND_USER:
+      BITCOIND_PASSWORD:
+
+    
+  blockprocessor-job-cluster:
+    build:
+      context: .
+      target: blockprocessor
+    ports: 
+      - "127.0.0.1:8081:8081"
+    command: job-cluster --job-classname net.santiment.btc.blockprocessor.Main ${SAVEPOINT_OPTIONS} ${FLINK_JOB_ARGUMENTS}
+
+    depends_on:
+      - zookeeper
+      - kafka
+      - blockprocessor-taskmanager
+
+    volumes:
+      - ./conf:/opt/flink/conf
+      - ./tmp/jobmanager:/tmp
+      - ./output:/output
+
+    environment:
+      KAFKA_URL: kafka:9092
+      ZOOKEEPER_URL: zookeeper:2181
+      CHECKPOINT_DATA_URI: file:///output/checkpoints
+      CHECKPOINT_INTERVAL_MS: 5000
+      MIN_PAUSE_BETWEEN_CHECKPOINTS: 1000
+      DELAY_BETWEEN_RESTARTS_S: 20
+
+  blockprocessor-taskmanager:
+    build:
+      context: .
+      target: blockprocessor
+
+    depends_on:
+      - kafka
+
+    volumes:
+      - ./conf:/opt/flink/conf
+      - ./tmp/taskmanager:/tmp
+      - ./output:/output
+      
+
+    command: "task-manager"
+
+    
 
 volumes:
   kafka_data:

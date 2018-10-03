@@ -7,13 +7,15 @@ import java.util.{Base64, Properties}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient
 import com.typesafe.scalalogging.LazyLogging
+import net.santiment.btc.oldexporter.BuildInfo
+import net.santiment.util.{MigrationUtil, Migrator, Store, ZookeeperStore}
+import net.santiment.util.Store._
 import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.ExponentialBackoffRetry
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 
 import collection.JavaConverters._
-import Store.IntSerde
 import org.apache.kafka.clients.admin.AdminClient
 
 /**
@@ -34,7 +36,7 @@ class Config {
 
   lazy val zk = ZookeeperConfig(
     connectionString = sys.env.getOrElse("ZOOKEEPER_URL", "localhost:2181"),
-    namespace = s"${BuildInfo.name}",
+    namespace = s"${BuildInfo.name}"
   )
 
   lazy val kafkaTopic = "btc-transfers-1"
@@ -72,8 +74,11 @@ class Globals extends LazyLogging
   //Migration store data
   lazy val nextMigrationStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkNextMigrationPath)
   lazy val nextMigrationToCleanStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkNextMigrationToCleanPath)
-  lazy val migrations = new Migrations(adminClient)
-  lazy val migrator = new Migrator(migrations.migrations, nextMigrationStore, nextMigrationToCleanStore)
+  lazy val migrations = Array(
+    MigrationUtil.topicMigration(adminClient, "btc-transfers-1",1,3)
+  )
+
+  lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
 
 
   lazy val lastWrittenHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastWrittenPath)
