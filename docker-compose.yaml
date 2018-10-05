@@ -46,11 +46,15 @@ services:
     depends_on:
       - zookeeper
       - kafka
+    volumes:
+      - /var/lib/clickhouse
+      - ./kafka-config.xml:/etc/clickhouse-server/config.d/kafka-config.xml
 
   clickhouse-client:
     image: yandex/clickhouse-client
     depends_on:
       - clickhouse
+
     command: ["--host", "clickhouse"]
 
   sbt:
