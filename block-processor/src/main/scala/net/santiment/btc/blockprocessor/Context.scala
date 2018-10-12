@@ -206,7 +206,7 @@ class Context(args:Array[String])
     // will restart by itself from the beginning even if the job is started from a savepoint
 
     val uid = s"raw-blocks-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
-    env.addSource(source).uid(uid).setParallelism(1)
+    env.addSource(source).uid(uid).name("raw-blocks-kafka-source").setParallelism(1)
   }
 
   lazy val consumeTransfers:DataStream[AccountChange]=>Unit = makeTransfersKafkaSink(config.transfersTopic)
@@ -253,7 +253,7 @@ class Context(args:Array[String])
     // not affect the new processing
     val uid = s"btc-transfers-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid)
+    stream=>stream.addSink(producer).uid(uid).name("transfers-kafka-sink")
 
   }
 

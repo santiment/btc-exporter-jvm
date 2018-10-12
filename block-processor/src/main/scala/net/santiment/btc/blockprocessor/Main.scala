@@ -30,6 +30,7 @@ class BlockProcessor
       // Extract account changes
       .flatMap(new BlockProcessorFlatMap())(implicitly[TypeInformation[AccountChange]])
       .uid("block-processor-flatmap")
+      .name("block-processor")
 
       // Assign timestamps and watermarks. The timestamps will be recorded in the kafka topic
       .assignTimestampsAndWatermarks(new AssignerWithPunctuatedWatermarks[AccountChange] {
