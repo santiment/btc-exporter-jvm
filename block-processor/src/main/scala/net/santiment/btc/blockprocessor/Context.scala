@@ -20,13 +20,11 @@ import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedCheckpointCleanup
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
-import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer011.Semantic
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer011, FlinkKafkaProducer011}
 import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema, KeyedSerializationSchema}
 import org.apache.kafka.clients.admin.AdminClient
-import net.santiment.util.Store._
 import org.rocksdb.{BlockBasedTableConfig, BloomFilter, ColumnFamilyOptions, DBOptions}
 
 import scala.util.hashing.MurmurHash3
@@ -60,6 +58,7 @@ class Context(args:Array[String])
 
 
   lazy val transfersAdminClient: AdminClient = makeKafkaAdminClient(config.transfersTopic)
+  lazy val stacksAdminClient: AdminClient = makeKafkaAdminClient(config.stacksTopic)
 
   def makeKafkaAdminClient(config:KafkaTopicConfig):AdminClient = {
     val properties = new Properties()
@@ -72,11 +71,11 @@ class Context(args:Array[String])
   lazy val nextMigrationToCleanStore: Store[Int] = new ZookeeperStore[Int](zk, config.migrations.nextMigrationToCleanPath)
 
   lazy val migrations = Array(
-    MigrationUtil.compactTopicMigration(transfersAdminClient, config.transfersTopic.topic,1,1)
+    MigrationUtil.compactTopicMigration(transfersAdminClient, config.transfersTopic.topic,1,1),
+    MigrationUtil.compactTopicMigration(stacksAdminClient, config.stacksTopic.topic, 1, 1)
   )
 
   lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
-
 
   lazy val stateBackend: StateBackend = makeRocksDBStateBackend(config.flink.checkpointDataURI, config.profile)
 
@@ -256,5 +255,51 @@ class Context(args:Array[String])
     stream=>stream.addSink(producer).uid(uid).name("transfers-kafka-sink")
 
   }
+
+  lazy val consumeStackChanges:DataStream[AccountModelChange]=>Unit = makeAccountModelChangeKafkaSink(config.stacksTopic)
+
+  def makeAccountModelChangeKafkaSink(config: KafkaTopicConfig): DataStream[AccountModelChange] => Unit = {
+    logger.info(s"Connecting stacks sink to ${config.bootstrapServers}, topic: ${config.topic}")
+    val properties = new Properties()
+
+    properties.setProperty("bootstrap.servers", config.bootstrapServers)
+    properties.setProperty("acks", "all")
+
+    //Write compressed batches to kafka
+    properties.put("compression.type", "lz4")
+
+
+    val serializationSchema: KeyedSerializationSchema[AccountModelChange] = new KeyedSerializationSchema[AccountModelChange] {
+
+      lazy val objectMapper: ObjectMapper = {
+        val result = new ObjectMapper()
+        result.registerModule(DefaultScalaModule)
+        result
+      }
+
+      override def serializeKey(element: AccountModelChange): Array[Byte] = {
+        //Make a unique key for each record so that we can compact the topic
+        s"${element.height}-${element.txPos}-${if(element.sign > 0) "A" else "D"}-${element.index}".getBytes(StandardCharsets.UTF_8)
+      }
+
+      override def serializeValue(element: AccountModelChange): Array[Byte] = {
+        objectMapper.writeValueAsBytes(element)
+      }
+
+      override def getTargetTopic(element: AccountModelChange): String = {
+        config.topic
+      }
+    }
+
+    val producer = new FlinkKafkaProducer011[AccountModelChange](config.topic, serializationSchema,properties, Semantic.AT_LEAST_ONCE)
+    producer.setWriteTimestampToKafka(true)
+
+    // We create a uid based on the name of the kafka topic. In this way if we change the topic any old saved state will
+    // not affect the new processing
+    val uid = s"btc-stacks-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
+
+    stream=>stream.addSink(producer).uid(uid).name("stacks-sink")
+  }
+
 
 }

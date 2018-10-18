@@ -5,7 +5,7 @@ import sbtassembly.AssemblyPlugin.defaultUniversalScript
 
 ThisBuild / organization := "net.santiment"
 ThisBuild / scalaVersion := SCALA_VERSION
-ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / version := "1"
 
 ThisBuild / resolvers  ++=Seq(
   "Apache Development Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots/",
@@ -112,6 +112,8 @@ lazy val blockprocessor = (project in file("block-processor"))
     Defaults.itSettings,
     name := "block-processor",
 
+    version := "1.2.0",
+
     libraryDependencies ++= flinkDependencies
       ++ logging
       ++ jackson
@@ -130,7 +132,7 @@ lazy val blockprocessor = (project in file("block-processor"))
     //exclude Scala library from assembly
     assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),
 
-    assemblyJarName in assembly := "block-processor.jar",
+    //assemblyJarName in assembly := "block-processor.jar",
 
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", xs @ _*) => MergeStrategy.discard
@@ -142,7 +144,4 @@ lazy val blockprocessor = (project in file("block-processor"))
       mainClass in (Compile, run),
       runner in (Compile,run)).evaluated
   )
-
-
-
 

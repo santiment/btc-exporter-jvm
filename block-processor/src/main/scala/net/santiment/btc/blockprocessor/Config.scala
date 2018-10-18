@@ -45,6 +45,7 @@ case class HistoricalJob
 
 class Config(args:Array[String]) {
 
+
   lazy val props: ParameterTool = ParameterTool.fromArgs(args)
 
   def getO(env:String, default:String=null): Option[String] = {
@@ -88,6 +89,11 @@ class Config(args:Array[String]) {
   lazy val transfersTopic = KafkaTopicConfig(
     getO("KAFKA_TRANSFERS_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
     get("KAFKA_TRANSFERS_TOPIC", "btc-transfers")
+  )
+
+  lazy val stacksTopic = KafkaTopicConfig(
+    getO("KAFKA_STACKS_URL").orElse(getO("KAFKA_URL", "localhost:9092")).get,
+    get("KAFKA_STACKS_TOPIC", "btc-stacks")
   )
 
   lazy val migrations = MigrationConfig(
