@@ -101,10 +101,9 @@ case class AccountModelChange
   height: Int,
   txPos: Int,
 
-  // Index used for disambiguation. All additions and deletions must be orderered and have an index. It
-  // will be used as part of a unique key which identifies this record. The whole key is
-  // (height,txPos,sign,index), or (ts,txPos,sign,index)
-  index: Int,
+  // nonce is used for disambiguation. The triple (sign, address, nonce) is a unique key for each account model
+  // change
+  nonce: Int,
 
   //Reference for the originating transaction for this segment (denoted by $Tx(s)$ in the documentation)
   ots: Long,
@@ -137,6 +136,7 @@ case class InternalAccountModelChange
   ts: Long,
   height: Int,
   txPos: Int,
+  nonce: Int,
   ots: Long,
   oheight: Int,
   otxPos: Int,
@@ -155,6 +155,10 @@ case class InternalAccountModelChange
   */
 case class Segment
 (
+  // The nonce is different for each segment associated to a given address. So the tuple (address,nonce) is a unique
+  // identifier for each segment
+  nonce: Int,
+
   //Reference for the originating transaction for this segment (denoted by $Tx(s)$ in the documentation)
   ots: Long,
   oheight: Int,

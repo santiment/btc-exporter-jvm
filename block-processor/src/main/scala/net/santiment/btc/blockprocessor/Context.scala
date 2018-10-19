@@ -1,7 +1,7 @@
 package net.santiment.btc.blockprocessor
 
 import java.nio.charset.StandardCharsets
-import java.util.Properties
+import java.util.{Optional, Properties}
 import java.util.concurrent.TimeUnit
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -22,6 +22,7 @@ import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedC
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer011.Semantic
+import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer011, FlinkKafkaProducer011}
 import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema, KeyedSerializationSchema}
 import org.apache.kafka.clients.admin.AdminClient
@@ -72,7 +73,7 @@ class Context(args:Array[String])
 
   lazy val migrations = Array(
     MigrationUtil.compactTopicMigration(transfersAdminClient, config.transfersTopic.topic,1,1),
-    MigrationUtil.compactTopicMigration(stacksAdminClient, config.stacksTopic.topic, 1, 1)
+    MigrationUtil.compactTopicMigration(stacksAdminClient, config.stacksTopic.topic, 3, 1)
   )
 
   lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
@@ -208,7 +209,10 @@ class Context(args:Array[String])
     env.addSource(source).uid(uid).name("raw-blocks-kafka-source").setParallelism(1)
   }
 
-  lazy val consumeTransfers:DataStream[AccountChange]=>Unit = makeTransfersKafkaSink(config.transfersTopic)
+  lazy val consumeTransfers:DataStream[AccountChange]=>Unit = {
+    if(config.features.transfers) makeTransfersKafkaSink(config.transfersTopic)
+    else _=>()
+  }
 
 
   def makeTransfersKafkaSink(config: KafkaTopicConfig): DataStream[AccountChange]=>Unit
@@ -256,7 +260,9 @@ class Context(args:Array[String])
 
   }
 
-  lazy val consumeStackChanges:DataStream[AccountModelChange]=>Unit = makeAccountModelChangeKafkaSink(config.stacksTopic)
+  lazy val consumeStackChanges:DataStream[AccountModelChange]=>Unit =
+    if(config.features.stackChanges) makeAccountModelChangeKafkaSink(config.stacksTopic)
+    else _=>()
 
   def makeAccountModelChangeKafkaSink(config: KafkaTopicConfig): DataStream[AccountModelChange] => Unit = {
     logger.info(s"Connecting stacks sink to ${config.bootstrapServers}, topic: ${config.topic}")
@@ -264,6 +270,7 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     properties.setProperty("acks", "all")
+    pro
 
     //Write compressed batches to kafka
     properties.put("compression.type", "lz4")
@@ -279,7 +286,7 @@ class Context(args:Array[String])
 
       override def serializeKey(element: AccountModelChange): Array[Byte] = {
         //Make a unique key for each record so that we can compact the topic
-        s"${element.height}-${element.txPos}-${if(element.sign > 0) "A" else "D"}-${element.index}".getBytes(StandardCharsets.UTF_8)
+        s"${element.address}-${element.nonce}-${if(element.sign > 0) "A" else "D"}".getBytes(StandardCharsets.UTF_8)
       }
 
       override def serializeValue(element: AccountModelChange): Array[Byte] = {
@@ -291,14 +298,24 @@ class Context(args:Array[String])
       }
     }
 
-    val producer = new FlinkKafkaProducer011[AccountModelChange](config.topic, serializationSchema,properties, Semantic.AT_LEAST_ONCE)
+    //Partition by hash code
+    val partitioner = new FlinkKafkaPartitioner[AccountModelChange] {
+      override def partition(record: AccountModelChange, key: Array[Byte], value: Array[Byte], targetTopic: String, partitions: Array[Int]): Int = {
+        record.address.hashCode % 3
+      }
+    }
+    val producer = new FlinkKafkaProducer011[AccountModelChange](
+      config.topic,
+      serializationSchema,
+      properties
+    )
     producer.setWriteTimestampToKafka(true)
 
     // We create a uid based on the name of the kafka topic. In this way if we change the topic any old saved state will
     // not affect the new processing
     val uid = s"btc-stacks-kafka-${MurmurHash3.stringHash(config.topic).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid).name("stacks-sink")
+    stream=>stream.addSink(producer).uid(uid).name("stacks-sink").setParallelism(3)
   }
 
 

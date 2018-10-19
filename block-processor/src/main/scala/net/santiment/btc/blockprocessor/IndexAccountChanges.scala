@@ -1,3 +1,4 @@
+/*
 package net.santiment.btc.blockprocessor
 
 import org.apache.flink.streaming.api.scala.function.ProcessAllWindowFunction
@@ -33,7 +34,6 @@ extends ProcessAllWindowFunction[InternalAccountModelChange, AccountModelChange,
           ts = internal.ts,
           height = internal.height,
           txPos = internal.txPos,
-          index = index,
           oheight = internal.oheight,
           otxPos = internal.otxPos,
           ots = internal.ots,
@@ -43,3 +43,4 @@ extends ProcessAllWindowFunction[InternalAccountModelChange, AccountModelChange,
     }
   }
 }
+*/

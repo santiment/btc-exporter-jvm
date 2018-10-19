@@ -132,7 +132,7 @@ lazy val blockprocessor = (project in file("block-processor"))
     //exclude Scala library from assembly
     assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),
 
-    //assemblyJarName in assembly := "block-processor.jar",
+    assemblyJarName in assembly := "block-processor.jar",
 
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", xs @ _*) => MergeStrategy.discard

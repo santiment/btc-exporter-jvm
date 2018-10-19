@@ -2,6 +2,7 @@ package net.santiment.btc.blockprocessor
 
 import com.typesafe.scalalogging.LazyLogging
 import net.santiment.util.Migrator
+import org.apache.flink.api.common.functions.Partitioner
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, _}
@@ -28,11 +29,11 @@ class BlockProcessor
     ctx.migrator.up()
 
     //This job is not parallel
-    ctx.env.setParallelism(1)
+    //ctx.env.setParallelism(1)
 
 
     val processedTxs = ctx.rawBlockSource
-      // Dummy key which allows us to use keyed map state
+      // Dummy key which allows us to use keyed map state. It also means that here we'll use paralellism 1
       .keyBy(_ =>())
 
       // Extract account changes
@@ -112,7 +113,7 @@ class BlockProcessor
       .uid("reduce-obvious-change")
 
 
-    // Convert processed transactoins to list of account changes. Output first the inputs, then the outputs
+    // Convert processed transactions to list of account changes. Output first the inputs, then the outputs
     def extractAccountChanges(txs: DataStream[ProcessedTx]):DataStream[AccountChange] = {
       txs.flatMap { tx =>
         val inputs = tx.inputs.zipWithIndex.map { case (entry, index) =>
@@ -182,32 +183,22 @@ class BlockProcessor
     // and outputs directly
 
 
-    val stackChanges = reducedChanges.keyBy(_.address)
+    val stackChanges = reducedChanges
+      .keyBy(_.address)
       .flatMap(new TransactionStackFlatMap())
+      .setParallelism(3)
       .uid("transaction-stack-flatmap")
       .name("transaction-stack-processor")
+      //.partitionCustom(new AddressPartitioner(), _.address)
 
-    // Next we add a unique index for each record. This is useful in Kafka and clickhouse. To do that we need to sort
-    // all rows in each transaction add add consecutive numbering to them. We do this with a window
-
-    val outputStackChanges:DataStream[AccountModelChange] = stackChanges
-      // We make tumbling windows of 100 ms. Since all txs in a block have a single timestamp, all of them will end
-      // up in one window. The watermark we emit is +999 ms from the timestamp of the block, which means that when the
-      // watermark is emitted, the window created for this block will be evaluated.
-      //
-      // Since windows are created only when a new element arrives, the small window size will not actually create a lot
-      // of windows - There will be only one window per block. So we won't have problems with the resource usage.
-      .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(100)))
-      .process[AccountModelChange](new IndexAccountChanges())
-
-    stackChanges.print()
+    //stackChanges.print()
     //Compute token circulation
     //TODO
 
 
     //Send to the kafka sink
     ctx.consumeTransfers(accountChanges)
-    ctx.consumeStackChanges(outputStackChanges)
+    ctx.consumeStackChanges(stackChanges)
 
     //processedTxs.print()
 

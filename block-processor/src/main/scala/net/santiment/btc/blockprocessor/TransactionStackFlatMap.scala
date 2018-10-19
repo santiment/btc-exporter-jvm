@@ -8,13 +8,14 @@ import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSn
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.util.Collector
+import org.bitcoinj.core.Coin
 
 
 /**
   * Computes the transaction stack changes from account changes.
   */
 class TransactionStackFlatMap
-  extends FlatMapFunction[ReducedAccountChange, InternalAccountModelChange]()
+  extends FlatMapFunction[ReducedAccountChange, AccountModelChange]()
   with CheckpointedFunction
     with LazyLogging {
 
@@ -25,6 +26,9 @@ class TransactionStackFlatMap
   @transient private var stackSize: ValueState[Integer] = _
   private var size: Int = _
 
+  @transient private var nonceState: ValueState[Integer] = _
+  private var nonce: Int = _
+
   override def initializeState(context: FunctionInitializationContext): Unit = {
     val stackDescriptor = new MapStateDescriptor[Int, Segment](
       "transaction-stacks", implicitly[TypeInformation[Int]], implicitly[TypeInformation[Segment]])
@@ -32,9 +36,13 @@ class TransactionStackFlatMap
     val stackSizeDescriptor = new ValueStateDescriptor[Integer](
       "stack-size", implicitly[TypeInformation[Integer]])
 
+    val nonceDescriptor = new ValueStateDescriptor[Integer](
+      "nonce", implicitly[TypeInformation[Integer]]
+    )
 
     stack = context.getKeyedStateStore.getMapState(stackDescriptor)
     stackSize = context.getKeyedStateStore.getState(stackSizeDescriptor)
+    nonceState = context.getKeyedStateStore.getState(nonceDescriptor)
 
     logger.trace("Connected")
   }
@@ -49,19 +57,38 @@ class TransactionStackFlatMap
     } else {
       size = sizeInteger.intValue()
     }
+
+    val tmpnonce = nonceState.value()
+    if(tmpnonce == null) {
+      nonceState.update(0)
+      nonce = 0
+    } else {
+      nonce = tmpnonce.intValue()
+    }
   }
 
   def commit(): Unit = {
     stackSize.update(size)
+    nonceState.update(nonce)
   }
 
   /**
     * Push a new segment in the stack
     * @param s - the segment to be pushed
     */
-  def push(s:Segment): Unit = {
-    stack.put(size, s)
+  def createAndPush(ots:Long, oheight:Int, otxPos: Int, value: Long): Segment = {
+    nonce += 1
+    val result = Segment(
+      nonce,
+      ots,
+      oheight,
+      otxPos,
+      value
+    )
+
+    stack.put(size, result)
     size += 1
+    result
   }
 
   /**
@@ -84,7 +111,7 @@ class TransactionStackFlatMap
     * @param value
     * @param out
     */
-  override def flatMap(value: ReducedAccountChange, out: Collector[InternalAccountModelChange]): Unit = {
+  override def flatMap(value: ReducedAccountChange, out: Collector[AccountModelChange]): Unit = {
 
     begin()
     logger.trace(s"processing $value stack size: $size")
@@ -100,16 +127,17 @@ class TransactionStackFlatMap
         logger.trace(s"rem=$rem, s.value=${s.value}")
         rem -= s.value
 
-        out.collect(InternalAccountModelChange(
+        out.collect(AccountModelChange(
           sign = -1,  //This is a deletion
           ts = value.ts,
           height = value.height,
           txPos = value.txPos,
+          nonce = s.nonce,
           ots = s.ots,
           oheight = s.oheight,
           otxPos = s.otxPos,
           address = value.address,
-          value = s.value
+          value = Coin.valueOf(s.value).toPlainString.toDouble
         ))
       }
 
@@ -120,23 +148,24 @@ class TransactionStackFlatMap
       // remainder, and emit the corresponding stack change.
 
       if (rem > 0L && size == 0) {
-        push(Segment(
+        val add = createAndPush(
           ots = 0,
           oheight = 0,
           otxPos = 0,
           value = -rem
-        ))
+        )
 
-        out.collect(InternalAccountModelChange(
+        out.collect(AccountModelChange(
           sign = 1, //This is an addition (of an liability)
           ts = value.ts,
           height = value.height,
           txPos = value.txPos,
+          nonce = add.nonce,
           ots = 0,
           oheight = 0,
           otxPos = 0,
           address = value.address,
-          value = -rem
+          value = Coin.valueOf(rem).negate().toPlainString.toDouble
         ))
 
         rem = 0L
@@ -144,45 +173,47 @@ class TransactionStackFlatMap
 
       if (rem<0) {
         //There is a remainder. We have to add a new segment to account for it
-        val remSegment = Segment(
+        val remSegment = createAndPush(
           ots = last_segment.ots,
           oheight = last_segment.oheight,
           otxPos = last_segment.otxPos,
           value = Math.abs(rem)
         )
-        push(remSegment)
-        out.collect(InternalAccountModelChange(
+
+        out.collect(AccountModelChange(
           sign = 1,  //This is an addition
           ts = value.ts,
           height = value.height,
           txPos = value.txPos,
+          nonce = remSegment.nonce,
           ots = remSegment.ots,
           oheight = remSegment.oheight,
           otxPos = remSegment.otxPos,
           address = value.address,
-          value = remSegment.value
+          value = Coin.valueOf(remSegment.value).toPlainString.toDouble
         ))
       }
     } else {
       // The account change is an output. In that case it's easy - just add a single new segment
 
-      push(Segment(
+      val s = createAndPush(
         ots = value.ts,
         oheight = value.height,
         otxPos = value.txPos,
         value = value.value //The output's value is positive by our convention - no need to take absolute
-      ))
+      )
 
-      out.collect(InternalAccountModelChange(
+      out.collect(AccountModelChange(
         sign = 1,
         ts = value.ts,
         height = value.height,
         txPos = value.txPos,
+        nonce = s.nonce,
         ots = value.ts,
         oheight = value.height,
         otxPos = value.txPos,
         address = value.address,
-        value = value.value
+        value = Coin.valueOf(value.value).toPlainString.toDouble
       ))
     }
     commit()

@@ -42,6 +42,12 @@ case class HistoricalJob
   minWriteBufferNumberToMerge: Int
 ) extends RocksDBProfile {}
 
+case class Features
+(
+  transfers: Boolean,
+  stackChanges: Boolean
+)
+
 
 class Config(args:Array[String]) {
 
@@ -115,5 +121,10 @@ class Config(args:Array[String]) {
     case x =>
       throw new IllegalArgumentException(s"Unknown profile: $x")
   }
+
+  lazy val features =  Features(
+    transfers = get("FEATURE_TRANSFERS", "true").toBoolean,
+    stackChanges = get("FEATURE_STACKS", default ="false").toBoolean
+  )
 
 }

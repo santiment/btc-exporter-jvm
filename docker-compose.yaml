@@ -123,6 +123,9 @@ services:
       - ./output:/output
 
     environment:
+      KAFKA_RAW_BLOCK_URL:
+      FEATURE_STACKS:
+      FEATURE_TRANSFERS:
       KAFKA_URL: kafka:9092
       ZOOKEEPER_URL: zookeeper:2181
       CHECKPOINT_DATA_URI: file:///output/checkpoints
