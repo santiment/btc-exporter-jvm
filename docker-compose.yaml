@@ -78,6 +78,7 @@ services:
       KAFKA_URL: kafka:9092
       KAFKA_RAW_BLOCK_URL: 
       KAFKA_TRANSFERS_URL: kafka:9092
+      KAFKA_STACKS_URL:
       ZOOKEEPER_URL: zookeeper:2181
       START_BLOCK: 52500
       BITCOIND_URL: 

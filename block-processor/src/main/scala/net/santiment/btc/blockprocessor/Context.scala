@@ -73,7 +73,9 @@ class Context(args:Array[String])
 
   lazy val migrations = Array(
     MigrationUtil.compactTopicMigration(transfersAdminClient, config.transfersTopic.topic,1,1),
-    MigrationUtil.compactTopicMigration(stacksAdminClient, config.stacksTopic.topic, 3, 1)
+    MigrationUtil.compactTopicMigration(stacksAdminClient, s"${config.stacksTopic.topic}.0", 3, 1),
+    MigrationUtil.compactTopicMigration(stacksAdminClient, s"${config.stacksTopic.topic}.1", 3, 1),
+    MigrationUtil.compactTopicMigration(stacksAdminClient, s"${config.stacksTopic.topic}.2", 3, 1)
   )
 
   lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
@@ -101,15 +103,17 @@ class Context(args:Array[String])
           }
 
           override def createColumnOptions(currentOptions: ColumnFamilyOptions): ColumnFamilyOptions = {
+            currentOptions.tableFormatConfig()
             new ColumnFamilyOptions()
               .optimizeForPointLookup(conf.blockCacheSizeMb)
               .setMaxWriteBufferNumber(conf.maxWriteBufferNumber) //default 2
               .setMinWriteBufferNumberToMerge(conf.minWriteBufferNumberToMerge) //default 1
               .setOptimizeFiltersForHits(true)
-              .setWriteBufferSize(conf.writeBufferSizeMb * 1024 * 1024) //256MB, default is 4MB
+              .setWriteBufferSize(conf.writeBufferSizeMb * 1024 * 1024) //default is 4MB
               .setTableFormatConfig(
               new BlockBasedTableConfig()
                 .setBlockCacheSize(conf.blockCacheSizeMb*1024*1024)
+                .setBlockSize(conf.blockSize)
                 .setFilter( new BloomFilter()) //bloom filters are apparently needed for reducing reads
             )
           }
@@ -270,7 +274,7 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     properties.setProperty("acks", "all")
-    pro
+
 
     //Write compressed batches to kafka
     properties.put("compression.type", "lz4")
@@ -294,16 +298,13 @@ class Context(args:Array[String])
       }
 
       override def getTargetTopic(element: AccountModelChange): String = {
-        config.topic
+        // Topic is chosen based on address. In this way we can distribute the clickhouse computation and have the table there partitioned
+        // by address
+        val idx = Math.floorMod(element.address.hashCode, 3)
+        s"${config.topic}.$idx"
       }
     }
 
-    //Partition by hash code
-    val partitioner = new FlinkKafkaPartitioner[AccountModelChange] {
-      override def partition(record: AccountModelChange, key: Array[Byte], value: Array[Byte], targetTopic: String, partitions: Array[Int]): Int = {
-        record.address.hashCode % 3
-      }
-    }
     val producer = new FlinkKafkaProducer011[AccountModelChange](
       config.topic,
       serializationSchema,

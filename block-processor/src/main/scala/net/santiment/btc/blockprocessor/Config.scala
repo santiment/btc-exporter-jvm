@@ -35,6 +35,7 @@ sealed trait RocksDBProfile
 case object CurrentJob extends RocksDBProfile {}
 case class HistoricalJob
 (
+  blockSize: Long,
   blockCacheSizeMb: Long,
   parallelism: Int,
   writeBufferSizeMb: Long,
@@ -112,11 +113,12 @@ class Config(args:Array[String]) {
   lazy val profile: RocksDBProfile = get("ROCKSDB_PROFILE","current") match {
     case "current" => CurrentJob
     case "historical" => HistoricalJob(
-      get("ROCKSDB_BLOCK_CACHE_SIZE_MB","4096").toLong,
-      get("ROCKSDB_PARALLELISM", "8").toInt,
-      get("ROCKSDB_WRITE_BUFFER_SIZE_MB","256").toLong,
-      get("ROCKSDB_MAX_WRITE_BUFFER_NUMBER", "5").toInt,
-      get("ROCKSDB_MIN_WRITE_BUFFER_NUMBER_TO_MERGE","2").toInt
+      blockSize = get("ROCKSDB_BLOCK_SIZE", "32768").toLong,
+      blockCacheSizeMb = get("ROCKSDB_BLOCK_CACHE_SIZE_MB", "256").toLong,
+      parallelism = get("ROCKSDB_PARALLELISM", "8").toInt,
+      writeBufferSizeMb = get("ROCKSDB_WRITE_BUFFER_SIZE_MB", "16").toLong,
+      maxWriteBufferNumber = get("ROCKSDB_MAX_WRITE_BUFFER_NUMBER", "5").toInt,
+      minWriteBufferNumberToMerge = get("ROCKSDB_MIN_WRITE_BUFFER_NUMBER_TO_MERGE", "4").toInt
     )
     case x =>
       throw new IllegalArgumentException(s"Unknown profile: $x")

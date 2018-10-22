@@ -74,15 +74,12 @@ class TransactionStackFlatMap
 
   /**
     * Push a new segment in the stack
-    * @param s - the segment to be pushed
     */
-  def createAndPush(ots:Long, oheight:Int, otxPos: Int, value: Long): Segment = {
+  def createAndPush(ots:Long, value: Long): Segment = {
     nonce += 1
     val result = Segment(
       nonce,
       ots,
-      oheight,
-      otxPos,
       value
     )
 
@@ -92,7 +89,7 @@ class TransactionStackFlatMap
   }
 
   /**
-    * Pops an element from the stack. If the stack is empty - returns None
+    * Pops an element from the stack. If the stack is empty - throws an exception
     * @return - The segment at the top of the stack
     */
   def pop(): Segment = {
@@ -134,8 +131,6 @@ class TransactionStackFlatMap
           txPos = value.txPos,
           nonce = s.nonce,
           ots = s.ots,
-          oheight = s.oheight,
-          otxPos = s.otxPos,
           address = value.address,
           value = Coin.valueOf(s.value).toPlainString.toDouble
         ))
@@ -150,8 +145,6 @@ class TransactionStackFlatMap
       if (rem > 0L && size == 0) {
         val add = createAndPush(
           ots = 0,
-          oheight = 0,
-          otxPos = 0,
           value = -rem
         )
 
@@ -162,8 +155,6 @@ class TransactionStackFlatMap
           txPos = value.txPos,
           nonce = add.nonce,
           ots = 0,
-          oheight = 0,
-          otxPos = 0,
           address = value.address,
           value = Coin.valueOf(rem).negate().toPlainString.toDouble
         ))
@@ -175,8 +166,6 @@ class TransactionStackFlatMap
         //There is a remainder. We have to add a new segment to account for it
         val remSegment = createAndPush(
           ots = last_segment.ots,
-          oheight = last_segment.oheight,
-          otxPos = last_segment.otxPos,
           value = Math.abs(rem)
         )
 
@@ -187,8 +176,6 @@ class TransactionStackFlatMap
           txPos = value.txPos,
           nonce = remSegment.nonce,
           ots = remSegment.ots,
-          oheight = remSegment.oheight,
-          otxPos = remSegment.otxPos,
           address = value.address,
           value = Coin.valueOf(remSegment.value).toPlainString.toDouble
         ))
@@ -198,8 +185,6 @@ class TransactionStackFlatMap
 
       val s = createAndPush(
         ots = value.ts,
-        oheight = value.height,
-        otxPos = value.txPos,
         value = value.value //The output's value is positive by our convention - no need to take absolute
       )
 
@@ -210,8 +195,6 @@ class TransactionStackFlatMap
         txPos = value.txPos,
         nonce = s.nonce,
         ots = value.ts,
-        oheight = value.height,
-        otxPos = value.txPos,
         address = value.address,
         value = Coin.valueOf(value.value).toPlainString.toDouble
       ))

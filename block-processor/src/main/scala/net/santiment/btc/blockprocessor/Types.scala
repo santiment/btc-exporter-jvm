@@ -83,7 +83,7 @@ case class ProcessedTx
   * @param ts
   * @param height
   * @param txPos
-  * @param index
+  * @param nonce
   * @param ots
   * @param oheight
   * @param otxPos
@@ -105,10 +105,11 @@ case class AccountModelChange
   // change
   nonce: Int,
 
-  //Reference for the originating transaction for this segment (denoted by $Tx(s)$ in the documentation)
+  // Reference for the originating transaction for this segment (denoted by $Tx(s)$ in the documentation). We only need
+  // the timestamp, so the original height and otxPos values will be skipped. This saves 8 bytes per record
   ots: Long,
-  oheight: Int,
-  otxPos: Int,
+  //oheight: Int,
+  //otxPos: Int,
 
   address: String,
 
@@ -138,8 +139,8 @@ case class InternalAccountModelChange
   txPos: Int,
   nonce: Int,
   ots: Long,
-  oheight: Int,
-  otxPos: Int,
+  //oheight: Int,
+  //otxPos: Int,
   address: String,
   value: Long
 )
@@ -159,10 +160,11 @@ case class Segment
   // identifier for each segment
   nonce: Int,
 
-  //Reference for the originating transaction for this segment (denoted by $Tx(s)$ in the documentation)
+  // Reference for the originating transaction for this segment (denoted by $Tx(s)$ in the documentation). We only need the
+  // timestamp, so we won't put a reference to the originating transaction here. This saves 8 bytes
   ots: Long,
-  oheight: Int,
-  otxPos: Int,
+  //oheight: Int,
+  //otxPos: Int,
 
   // In the documentation we require to also have the address as part of the segment. However in practice we store
   // the segments keyed by the address, so no need to also keep it as part of the segment here. It would only take up
