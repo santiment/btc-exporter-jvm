@@ -181,6 +181,12 @@ class Context(args:Array[String])
     properties.setProperty("group.id", "")
     properties.setProperty("enable.auto.commit", "false")
     properties.setProperty("auto.offset.reset", "earliest")
+    // 50 MB fetch size (default is 1MB) This should utilise our HDDs better
+    // Also the default value for max.fetch.bytes for the Kafka consumer in Flink
+    // is 50MB. Since we read from a single partition, before the max fetch size was effectively
+    // 1MB
+    properties.setProperty("max.partition.fetch.bytes", "52428800")
+
 
     //We use transactions
     properties.setProperty("isolation.level", "read_committed")
@@ -226,6 +232,14 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     properties.setProperty("acks", "all")
+    properties.setProperty("batch.size", "52428800")
+    properties.setProperty("linger.ms", "2000")
+    // Maximum request size of a single request to Kafka (default is 1MB)
+    properties.setProperty("max.request.size", "52428800")
+    // Time waiting until for request to be processed. Default is 30s. When we increase request
+    // size we'd better increase the timeout as well.
+    properties.setProperty("request.timeout.ms", "60000")
+
 
     //Write compressed batches to kafka
     properties.put("compression.type", "lz4")
@@ -274,6 +288,8 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     properties.setProperty("acks", "all")
+    properties.setProperty("batch.size", "52428800")
+    properties.setProperty("linger.ms", "2000")
 
 
     //Write compressed batches to kafka

@@ -13,7 +13,9 @@ object MigrationUtil {
       name = s"Create topic $topic",
       up = ()=> {
         val  config = Map[String,String](
-          ("compression.type", "lz4")
+          ("compression.type", "lz4"),
+          //upper limit for fetch size
+          ("max.message.bytes", "52428800")
         )
         val t = new NewTopic(topic,numPartitions,replicationFactor)
 
@@ -31,7 +33,9 @@ object MigrationUtil {
       up = ()=> {
         val  config = Map[String,String](
           ("compression.type", "lz4"),
-          ("cleanup.policy", "compact")
+          ("cleanup.policy", "compact"),
+          //upper limit for fetch size
+          ("max.message.bytes", "52428800")
         )
 
         val t = new NewTopic(topic,numPartitions,replicationFactor)
