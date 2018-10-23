@@ -232,7 +232,7 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     properties.setProperty("acks", "all")
-    properties.setProperty("batch.size", "52428800")
+    properties.setProperty("batch.size", "5242880")
     properties.setProperty("linger.ms", "2000")
     // Maximum request size of a single request to Kafka (default is 1MB)
     properties.setProperty("max.request.size", "52428800")
@@ -288,7 +288,7 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     properties.setProperty("acks", "all")
-    properties.setProperty("batch.size", "52428800")
+    properties.setProperty("batch.size", "5242880")
     properties.setProperty("linger.ms", "2000")
 
 
