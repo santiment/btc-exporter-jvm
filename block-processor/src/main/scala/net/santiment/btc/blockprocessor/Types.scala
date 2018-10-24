@@ -145,6 +145,10 @@ case class InternalAccountModelChange
   value: Long
 )
 
+trait Address[T] {
+  def address(value:T):String
+}
+
 /**
   * Account model segment. [[ots]], [[oheight]] and [[otxPos]] reference for the originating transaction for this
   * segment (denoted by $Tx(s)$ in the documentation)
@@ -176,3 +180,16 @@ case class Segment
   // special situations) means that this segment is a liability
   value: Long
 )
+
+object Types {
+  implicit object AccountChangeAddress extends Address[AccountChange] {
+    def address(value:AccountChange): String = value.address
+  }
+
+  implicit object AccountModelChangeAddress extends Address[AccountModelChange] {
+    def address(value:AccountModelChange): String = value.address
+  }
+
+
+
+}

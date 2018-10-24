@@ -7,7 +7,8 @@ import org.apache.flink.api.java.utils.ParameterTool
 case class KafkaTopicConfig
 (
   bootstrapServers: String,
-  topic: String
+  topics: Array[String],
+  numPartitions: Option[Int]
 )
 
 case class MigrationConfig
@@ -90,17 +91,20 @@ class Config(args:Array[String]) {
   lazy val rawBlockTopic = KafkaTopicConfig(
     //We support different Kafka clusters for the input and output topics in this way
     getO("KAFKA_RAW_BLOCK_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
-    get("KAFKA_RAW_BLOCK_TOPIC", "btc-raw-blocks")
+    get("KAFKA_RAW_BLOCK_TOPIC", "btc-raw-blocks").split(','),
+    None
   )
 
   lazy val transfersTopic = KafkaTopicConfig(
     getO("KAFKA_TRANSFERS_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
-    get("KAFKA_TRANSFERS_TOPIC", "btc-transfers")
+    get("KAFKA_TRANSFERS_TOPICS", "btc-transfers").split(','),
+    getO("KAFKA_TRANSFERS_PARTITIONS").map(_.toInt).orElse(Some(1))
   )
 
   lazy val stacksTopic = KafkaTopicConfig(
     getO("KAFKA_STACKS_URL").orElse(getO("KAFKA_URL", "localhost:9092")).get,
-    get("KAFKA_STACKS_TOPIC", "btc-stacks")
+    get("KAFKA_STACKS_TOPIC", "btc-stacks").split(','),
+    getO("KAFKA_STACKS_PARTITIONS").map(_.toInt).orElse(Some(1))
   )
 
   lazy val migrations = MigrationConfig(
@@ -128,5 +132,4 @@ class Config(args:Array[String]) {
     transfers = get("FEATURE_TRANSFERS", "true").toBoolean,
     stackChanges = get("FEATURE_STACKS", default ="false").toBoolean
   )
-
 }
