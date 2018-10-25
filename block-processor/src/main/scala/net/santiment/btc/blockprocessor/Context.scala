@@ -28,8 +28,9 @@ import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema
 import org.apache.kafka.clients.admin.AdminClient
 import org.rocksdb.{BlockBasedTableConfig, BloomFilter, ColumnFamilyOptions, DBOptions}
 import net.santiment.btc.blockprocessor.Types._
-import scala.collection.JavaConverters._
+import org.apache.flink.api.java.utils.ParameterTool
 
+import scala.collection.JavaConverters._
 import scala.util.hashing.MurmurHash3
 
 class Context(args:Array[String])
@@ -75,9 +76,11 @@ class Context(args:Array[String])
 
   def makeMigrator():Migrator = {
     //Don't modify migrations that are already applied to production.
-    val m_1_createTransfers = MigrationUtil.compactTopicMigration(transfersAdminClient,config.transfersTopic.topics,config.transfersTopic.numPartitions.get,1)
+    val m_1_createTransfers = MigrationUtil.compactTopicsMigration(transfersAdminClient,config.transfersTopic.topics,
+      config.transfersTopic.numPartitions.get,
+      1)
 
-    val m_2_createStacks = MigrationUtil.compactTopicMigration(transfersAdminClient, config.stacksTopic.topics, config.stacksTopic.numPartitions.get, 1)
+    val m_2_createStacks = MigrationUtil.compactTopicsMigration(transfersAdminClient, config.stacksTopic.topics, config.stacksTopic.numPartitions.get, 1)
 
     val migrations = Array(m_1_createTransfers, m_2_createStacks)
     new Migrator(migrations, nextMigrationStore,nextMigrationToCleanStore)
@@ -144,9 +147,6 @@ class Context(args:Array[String])
                                        props: ExecutionConfig.GlobalJobParameters
                                      ): StreamExecutionEnvironment = {
     env.setStateBackend(stateBackend)
-
-    //Expose arguments to web ui
-    env.getConfig.setGlobalJobParameters(props)
 
     // Checkpoint config
     env.enableCheckpointing(config.checkpointInterval.toMillis)
@@ -273,7 +273,7 @@ class Context(args:Array[String])
       }
     }
 
-    val partitioner:FlinkKafkaPartitioner[AccountChange] = new KafkaAddressPartitioner[AccountChange](config.topics.length)
+    val partitioner:FlinkKafkaPartitioner[AccountChange] = new KafkaPartitioner[AccountChange](config.topics.length, _.address)
 
     val producer = new FlinkKafkaProducer011[AccountChange](
       config.topics(0),
@@ -335,7 +335,7 @@ class Context(args:Array[String])
 
     }
 
-    val partitioner:FlinkKafkaPartitioner[AccountModelChange] = new KafkaAddressPartitioner[AccountModelChange](config.topics.length)
+    val partitioner:FlinkKafkaPartitioner[AccountModelChange] = new KafkaPartitioner[AccountModelChange](config.topics.length, _.address)
 
     val producer = new FlinkKafkaProducer011[AccountModelChange](
       config.topics(0),
@@ -350,6 +350,16 @@ class Context(args:Array[String])
     val uid = s"btc-stacks-kafka-${MurmurHash3.stringHash(config.topics.mkString("")).toHexString}"
 
     stream=>stream.addSink(producer).uid(uid).name("stacks-sink").setParallelism(3)
+  }
+
+  def execute(jobname:String) = {
+    //Compute final config
+    val props = ParameterTool.fromMap(config.computedProps.asJava)
+
+    //Expose config to web ui
+    env.getConfig.setGlobalJobParameters(props)
+
+    env.execute(jobname)
   }
 
 

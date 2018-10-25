@@ -9,10 +9,10 @@ class AddressPartitioner(val numTopics: Int) extends Partitioner[String] {
   }
 }
 
-class KafkaAddressPartitioner[T:Address](val numTopics: Int) extends FlinkKafkaPartitioner[T] {
+class KafkaPartitioner[T](val numTopics: Int, keyGetter: T=>String) extends FlinkKafkaPartitioner[T] {
   override def partition(record: T, key: Array[Byte], value: Array[Byte], targetTopic: String, partitions: Array[Int]): Int = {
     val sorted = partitions.sorted
-    val address = implicitly[Address[T]].address(record)
-    sorted(Math.floorMod(Math.floorDiv(address.hashCode, numTopics),sorted.length))
+    val key = keyGetter(record)
+    sorted(Math.floorMod(Math.floorDiv(key.hashCode, numTopics),sorted.length))
   }
 }

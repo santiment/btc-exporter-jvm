@@ -35,7 +35,7 @@ lazy val oldexporter = (project in file("old-exporter"))
       jsonrpc,
       bitcoinj,
       zookeeper,
-      kafka
+      kafkaClients
     ) ++ logging ++ curatorLibs ++ jackson,
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
@@ -67,7 +67,7 @@ lazy val util = (project in file("util"))
 
     libraryDependencies ++= Seq (
       scalaLogging,
-      kafka,
+      kafkaClients,
       zookeeper
     ) ++ curatorLibs
   )
@@ -89,7 +89,7 @@ lazy val rawexporter = (project in file("raw-exporter"))
       jsonrpc,
       bitcoinj,
       zookeeper,
-      kafka
+      kafkaClients
     ) ++ logging ++ curatorLibs ++ jackson,
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
@@ -119,6 +119,7 @@ lazy val blockprocessor = (project in file("block-processor"))
       ++ jackson
       ++ Seq(
       scalaTest % s"${Test.name},${IntegrationTest.name}",
+      kafka % s"${Test.name},${IntegrationTest.name}",
       bitcoinj
     ),
 

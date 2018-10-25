@@ -5,6 +5,8 @@ import java.util.concurrent.TimeUnit
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 
+
+
 import collection.JavaConverters._
 
 object MigrationUtil extends LazyLogging {
@@ -42,9 +44,9 @@ object MigrationUtil extends LazyLogging {
       })
 
   def compactTopicMigration(kafka: AdminClient, topic:String, numPartitions:Int, replicationFactor:Short): Migration =
-    compactTopicMigration(kafka, Seq(topic), numPartitions, replicationFactor)
+    compactTopicsMigration(kafka, Array(topic), numPartitions, replicationFactor)
 
-  def compactTopicMigration(kafka: AdminClient, topics:Seq[String], numPartitions:Int, replicationFactor:Short): Migration =
+  def compactTopicsMigration(kafka: AdminClient, topics:Array[String], numPartitions:Int, replicationFactor:Short): Migration =
     Migration(
       name = s"Create topics ${topics.mkString(",")}",
       up = ()=> {

@@ -4,6 +4,8 @@ import java.time.Duration
 
 import org.apache.flink.api.java.utils.ParameterTool
 
+import scala.collection.mutable
+
 case class KafkaTopicConfig
 (
   bootstrapServers: String,
@@ -56,13 +58,19 @@ class Config(args:Array[String]) {
 
   lazy val props: ParameterTool = ParameterTool.fromArgs(args)
 
+  lazy val computedProps: mutable.Map[String, String] = mutable.Map[String,String]()
+
   def getO(env:String, default:String=null): Option[String] = {
     val prop = env.toLowerCase.replace('_','.')
-    if(props.has(prop)) {
-      Option(props.get(prop))
+    (if(props.has(prop)) {
+      Option(computedProps(prop))
     } else {
-      sys.env.get(env).orElse(Option(default)).map {dflt=> props.get(prop,dflt)}
-    }
+      sys.env.get(env).orElse(Option(default)).map(props.get(prop,_))
+    })
+      .map { res =>
+        computedProps(prop) = res
+        res
+      }
   }
 
   def get(env:String, default:String = null):String = getO(env,default).get
@@ -98,13 +106,13 @@ class Config(args:Array[String]) {
   lazy val transfersTopic = KafkaTopicConfig(
     getO("KAFKA_TRANSFERS_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
     get("KAFKA_TRANSFERS_TOPICS", "btc-transfers").split(','),
-    getO("KAFKA_TRANSFERS_PARTITIONS").map(_.toInt).orElse(Some(1))
+    getO("KAFKA_TRANSFERS_NUM_BROKERS").orElse(getO("KAFKA_NUM_BROKERS","1")).map(_.toInt)
   )
 
   lazy val stacksTopic = KafkaTopicConfig(
     getO("KAFKA_STACKS_URL").orElse(getO("KAFKA_URL", "localhost:9092")).get,
-    get("KAFKA_STACKS_TOPIC", "btc-stacks").split(','),
-    getO("KAFKA_STACKS_PARTITIONS").map(_.toInt).orElse(Some(1))
+    get("KAFKA_STACKS_TOPICS", "btc-stacks").split(','),
+    getO("KAFKA_STACKS_NUM_BROKERS").orElse(getO("KAFKA_NUM_BROKERS", "1")).map(_.toInt)
   )
 
   lazy val migrations = MigrationConfig(

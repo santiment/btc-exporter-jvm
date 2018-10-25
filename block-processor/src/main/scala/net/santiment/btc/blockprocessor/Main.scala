@@ -202,7 +202,8 @@ class BlockProcessor
 
     //processedTxs.print()
 
-    ctx.env.execute("btc-block-processor")
+
+    ctx.execute("btc-block-processor")
   }
 }
 
