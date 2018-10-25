@@ -1,15 +1,11 @@
 package net.santiment.btc.blockprocessor
 
 import com.typesafe.scalalogging.LazyLogging
-import net.santiment.util.Migrator
-import org.apache.flink.api.common.functions.Partitioner
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, _}
+import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.apache.flink.streaming.api.watermark.Watermark
-import org.apache.flink.streaming.api.windowing.assigners.{EventTimeSessionWindows, GlobalWindows, TumblingEventTimeWindows}
 import org.apache.flink.streaming.api.windowing.time.Time
-import org.apache.flink.streaming.api.windowing.triggers.EventTimeTrigger
 import org.bitcoinj.core.Coin
 
 import scala.collection.mutable
@@ -30,6 +26,67 @@ class BlockProcessor
 
     //This job is not parallel
     //ctx.env.setParallelism(1)
+
+
+    val unprocessedEntries = ctx.rawBlockSource
+      .flatMap(new RawBlockParserFlaMap())
+      .uid("block-parser-flatmap")
+      .name("block-parser")
+
+      .assignTimestampsAndWatermarks( new AssignerWithPunctuatedWatermarks[UnmatchedTxEntry] {
+        override def checkAndGetNextWatermark(lastElement: UnmatchedTxEntry, extractedTimestamp: Long): Watermark = {
+          if(lastElement.key == null)
+            // This is the last tx for this block. We emit a watermark here. We assume that the timestamp of the next
+            // block will be at least 1 second bigger. Otherwise there could be problems
+            new Watermark(extractedTimestamp+999)
+          else
+            null
+        }
+
+        override def extractTimestamp(element: UnmatchedTxEntry, previousElementTimestamp: Long): Long = {
+          element.ts * 1000 //Timestamps are given in seconds so we need to convert to ms
+        }
+      })
+
+
+    val processedEntries = unprocessedEntries
+      .keyBy(_.key)
+      .flatMap( new TxOutputSpenderFlatmap())
+      .uid("tx-output-spender-flatmap")
+      .name("tx-output-spender")
+
+
+    val reduceChanges = processedEntries
+      .keyBy(_.address)
+      .timeWindow(Time.milliseconds(1))
+      .apply[ReducedAccountChange] { (address, window, entries, out) =>
+        val result = entries
+          .groupBy(_.txPos)
+          .map { case (txPos, xs) =>
+            val value = xs.view.map(_.value).sum
+            ReducedAccountChange(
+              ts = xs.head.ts,
+              height = xs.head.height,
+              txPos = txPos,
+              value = value,
+              address = address
+            )
+          }
+          .toArray
+          .sortBy(_.txPos)
+
+        for (entry <- result) {
+          if (entry.value != 0L) {
+            out.collect(entry)
+          }
+        }
+      }
+      .uid("reduce-obvious-change")
+      .name("reduce-obvious-change")
+
+
+
+
 
 
     val processedTxs = ctx.rawBlockSource

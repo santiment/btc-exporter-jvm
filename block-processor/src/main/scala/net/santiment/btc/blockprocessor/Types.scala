@@ -1,5 +1,8 @@
 package net.santiment.btc.blockprocessor
 
+import org.bitcoinj.core.{Coin, TransactionOutPoint, TransactionOutput}
+import org.bitcoinj.script.Script
+
 case class RawBlock(height:Int, bytes: ByteArray)
 
 /**
@@ -180,6 +183,46 @@ case class Segment
   // special situations) means that this segment is a liability
   value: Long
 )
+
+/**
+  * One unprocessed tx entry, either input or output.
+  * @param ts block timestamp
+  * @param height block height
+  * @param txPos tx position in block
+  * @param key -  If output, this is contains the transaction hash of the output and the index . If input, this contains
+  *            the data for the corresponding output
+  * @param value - If input, this is null. If output this contains the script and tha bitcoin value of the output
+  *
+  * We are also using one special record: In this record the key is null. It indicates that there are no more records
+  * for this block, so we can emit a watermark.
+  */
+
+case class UnmatchedTxEntry
+(
+ts: Long,
+height: Int,
+txPos: Int,
+key:OutputKey,
+value: Output
+)
+
+case class OutputKey(hash: ByteArray, index: Long)
+
+case class ParsedOutput(script:Script, value:Coin)
+
+case class Output(script:ByteArray, value:Long) {
+  def parse() : ParsedOutput  = ParsedOutput(new Script(script), Coin.valueOf(value))
+}
+
+object OutputKey {
+  def fromOutpoint(o:TransactionOutPoint):OutputKey = OutputKey(o.getHash.getBytes,o.getIndex)
+}
+
+object Output {
+  def fromTxOutput(out:TransactionOutput) : Output = Output(out.getScriptBytes, out.getValue.value)
+}
+
+
 
 object Types {
   implicit object AccountChangeAddress extends Address[AccountChange] {
