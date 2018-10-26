@@ -31,7 +31,8 @@ case class FlinkConfig
   externalizedCheckpointsEnabled: Boolean,
   maxNumberOfRestartsInInterval: Int,
   restartsInterval: Duration,
-  delayBetweenRestarts: Duration
+  delayBetweenRestarts: Duration,
+  paralellism: Option[Int]
 )
 
 sealed trait RocksDBProfile
@@ -93,7 +94,9 @@ class Config(args:Array[String]) {
       get("RESTARTS_INTERVAL_S","3600").toInt),
 
     delayBetweenRestarts = Duration.ofSeconds(
-      get("DELAY_BETWEEN_RESTARTS_S","300").toInt)
+      get("DELAY_BETWEEN_RESTARTS_S","300").toInt),
+
+    paralellism = getO("PARALELLISM").map(_.toInt)
   )
 
   lazy val rawBlockTopic = KafkaTopicConfig(

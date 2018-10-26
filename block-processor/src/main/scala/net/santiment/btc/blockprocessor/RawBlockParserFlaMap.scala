@@ -1,13 +1,17 @@
 package net.santiment.btc.blockprocessor
 
+import com.typesafe.scalalogging.LazyLogging
 import net.santiment.btc.BitcoinClient
 import org.apache.flink.api.common.functions.FlatMapFunction
 import org.apache.flink.util.Collector
+
 import scala.collection.JavaConverters._
 
-class RawBlockParserFlaMap extends FlatMapFunction[RawBlock, UnmatchedTxEntry] {
+class RawBlockParserFlaMap extends FlatMapFunction[RawBlock, UnmatchedTxEntry]
+with LazyLogging
+{
   override def flatMap(value: RawBlock, out: Collector[UnmatchedTxEntry]): Unit = {
-
+    logger.trace(s"Parsing block ${value.height}")
     //1. Deserialize block
     val block = BitcoinClient.toBlock(value.bytes)
     val txs = block.getTransactions.asScala.zipWithIndex
@@ -25,8 +29,8 @@ class RawBlockParserFlaMap extends FlatMapFunction[RawBlock, UnmatchedTxEntry] {
               ts = ts,
               height = height,
               txPos = txPos,
-              key = OutputKey.fromOutpoint(input.getOutpoint),
-              value = null
+              key = Option(OutputKey.fromOutpoint(input.getOutpoint)),
+              value = None
             ))
           }
         }
@@ -37,8 +41,8 @@ class RawBlockParserFlaMap extends FlatMapFunction[RawBlock, UnmatchedTxEntry] {
             ts = ts,
             height = height,
             txPos = txPos,
-            key = OutputKey.fromOutpoint(output.getOutPointFor),
-            value = Output.fromTxOutput(output)
+            key = Option(OutputKey.fromOutpoint(output.getOutPointFor)),
+            value = Option(Output.fromTxOutput(output))
           ))
         }
     }
@@ -48,8 +52,8 @@ class RawBlockParserFlaMap extends FlatMapFunction[RawBlock, UnmatchedTxEntry] {
       ts = ts,
       height = height,
       txPos = txs.length,
-      null,
-      null
+      None,
+      None
     ))
   }
 }

@@ -1,5 +1,6 @@
 package net.santiment.btc.blockprocessor
 
+import com.typesafe.scalalogging.LazyLogging
 import net.santiment.btc.{BitcoinAddress, BitcoinClient}
 import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
@@ -10,7 +11,8 @@ import org.apache.flink.api.scala._
 import org.bitcoinj.core.ScriptException
 
 class TxOutputSpenderFlatmap
-extends RichFlatMapFunction[UnmatchedTxEntry, ReducedAccountChange]  {
+extends RichFlatMapFunction[UnmatchedTxEntry, ReducedAccountChange]
+with LazyLogging {
 
   @transient private var utxo: ValueState[Output] = _
 
@@ -37,22 +39,22 @@ extends RichFlatMapFunction[UnmatchedTxEntry, ReducedAccountChange]  {
   }
 
   override def flatMap(value: UnmatchedTxEntry, out: Collector[ReducedAccountChange]): Unit = {
-
+    logger.trace(s"Processing unmatched entry ${value.height}-${value.txPos}")
     // If key is null do nothing, this is the dummy entry signifying end of block
-    if(value.key == null) {
+    if(value.key.isEmpty) {
 
     }
 
     // If this is output - store the value in the state and emit the corresponding account change
-    else if(value.value != null) {
-      utxo.update(value.value)
+    else if(value.value.isDefined) {
+      utxo.update(value.value.get)
 
       out.collect(ReducedAccountChange(
         ts = value.ts,
         height = value.height,
         txPos = value.txPos,
-        value = value.value.value,
-        address = getAddress(value.value)
+        value = value.value.get.value,
+        address = getAddress(value.value.get)
       ))
     }
 

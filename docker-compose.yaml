@@ -88,6 +88,8 @@ services:
       BITCOIND_USER: 
       BITCOIND_PASSWORD:
       CHECKPOINT_DATA_URI: file:///app/output/checkpoints
+      FEATURE_STACKS:
+      FEATURE_TRANSFERS:
 
   rawexporter:
     build:

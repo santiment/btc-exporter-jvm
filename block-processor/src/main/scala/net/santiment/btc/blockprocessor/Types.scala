@@ -1,5 +1,7 @@
 package net.santiment.btc.blockprocessor
 
+import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.scala._
 import org.bitcoinj.core.{Coin, TransactionOutPoint, TransactionOutput}
 import org.bitcoinj.script.Script
 
@@ -13,7 +15,6 @@ case class RawBlock(height:Int, bytes: ByteArray)
   * @param ts -- block timestamp in miliseconds
   * @param height -- block height
   * @param txPos -- position of originating transaction in the block
-  * @param index -- index of the input/output of the transaction.
   * @param value -- amount of row in BTC. It is negative for inputs and positive for outputs
   * @param address -- address affected by this change
   *
@@ -25,15 +26,13 @@ case class AccountChange
   ts: Long,
   height: Int,
   txPos: Int,
-  index: Int,
   value: Double,
   address: String
 )
 
 /**
   * This is similar to the [[AccountChange]], however it is intended for internal use.
-  * We have reduced the size of the record by removing the index. Also here the value is given in
-  * satoshis and we record inputs with negative value, and outputs with positive.
+  * Here the value is given in satoshis. and we record inputs with negative value, and outputs with positive.
   *
   * @param ts
   * @param height
@@ -202,11 +201,19 @@ case class UnmatchedTxEntry
 ts: Long,
 height: Int,
 txPos: Int,
-key:OutputKey,
-value: Output
+key: Option[OutputKey],
+value: Option[Output]
 )
 
-case class OutputKey(hash: ByteArray, index: Long)
+/**
+  *
+  * @param hash a byte-array containing transaction hash converted to a string. We need a string here, because current flink
+  *             version does not allow arrays in keys
+  * @param index index of the output in its transaction
+  */
+case class OutputKey(_hash: String, index: Long) {
+  def hash: Array[Byte] = _hash.toCharArray.map(_.toByte)
+}
 
 case class ParsedOutput(script:Script, value:Coin)
 
@@ -215,7 +222,12 @@ case class Output(script:ByteArray, value:Long) {
 }
 
 object OutputKey {
-  def fromOutpoint(o:TransactionOutPoint):OutputKey = OutputKey(o.getHash.getBytes,o.getIndex)
+  def fromOutpoint(o:TransactionOutPoint):OutputKey = {
+    OutputKey(
+      o.getHash.getBytes.map(_.toChar).mkString,
+      o.getIndex)
+  }
+
 }
 
 object Output {

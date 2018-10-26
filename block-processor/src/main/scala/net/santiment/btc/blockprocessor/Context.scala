@@ -173,6 +173,8 @@ class Context(args:Array[String])
     // Set time to be event time.
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
+    // Set paralellism. If config value is undefined we'll use the default paralellism
+    config.paralellism.foreach(env.setParallelism)
     env
   }
 
@@ -191,7 +193,7 @@ class Context(args:Array[String])
     // Also the default value for max.fetch.bytes for the Kafka consumer in Flink
     // is 50MB. Since we read from a single partition, before the max fetch size was effectively
     // 1MB
-    properties.setProperty("max.partition.fetch.bytes", "52428800")
+    properties.setProperty("max.partition.fetch.bytes", "5242880")
 
 
     //We use transactions
@@ -261,7 +263,7 @@ class Context(args:Array[String])
 
       override def serializeKey(element: AccountChange): Array[Byte] = {
         //Make a unique key for each record so that we can compact the topic
-        s"${element.height}-${element.txPos}-${if(element.in) "in" else "out"}-${element.index}".getBytes(StandardCharsets.UTF_8)
+        s"${element.height}-${element.txPos}-${element.address}".getBytes(StandardCharsets.UTF_8)
       }
 
       override def serializeValue(element: AccountChange): Array[Byte] = {
@@ -309,7 +311,8 @@ class Context(args:Array[String])
     properties.put("compression.type", "lz4")
 
 
-    val serializationSchema: KeyedSerializationSchema[AccountModelChange] = new KeyedSerializationSchema[AccountModelChange] {
+    val serializationSchema: KeyedSerializationSchema[AccountModelChange] = new KeyedSerializationSchema[AccountModelChange]
+    with LazyLogging {
 
       lazy val objectMapper: ObjectMapper = {
         val result = new ObjectMapper()
@@ -323,13 +326,16 @@ class Context(args:Array[String])
       }
 
       override def serializeValue(element: AccountModelChange): Array[Byte] = {
+        logger.trace(s"Serializing: ${element}")
         objectMapper.writeValueAsBytes(element)
       }
 
       override def getTargetTopic(element: AccountModelChange): String = {
         // Topic is chosen based on address. In this way we can distribute the clickhouse computation and have the table there partitioned
         // by address
-        config.topics(Math.floorMod(element.address.hashCode, config.topics.length))
+        val topic = config.topics(Math.floorMod(element.address.hashCode, config.topics.length))
+        logger.trace(s"sending ${element} to $topic")
+        topic
       }
 
 
@@ -349,7 +355,7 @@ class Context(args:Array[String])
     // not affect the new processing
     val uid = s"btc-stacks-kafka-${MurmurHash3.stringHash(config.topics.mkString("")).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid).name("stacks-sink").setParallelism(3)
+    stream=>stream.addSink(producer).uid(uid).name("stacks-sink")
   }
 
   def execute(jobname:String) = {
