@@ -81,7 +81,7 @@ services:
       KAFKA_TRANSFERS_TOPICS: btc-transfers.0,btc-transfers.1,btc-transfers.2
       KAFKA_STACKS_TOPICS: btc-stacks.0,btc-stacks.1,btc-stacks.2
       KAFKA_STACKS_URL:
-      ZOOKEEPER_URL: zookeeper:2181
+      ZOOKEEPER_URL:
       START_BLOCK: 52500
       BITCOIND_URL: 
       BITCOIND_PORT: 8332

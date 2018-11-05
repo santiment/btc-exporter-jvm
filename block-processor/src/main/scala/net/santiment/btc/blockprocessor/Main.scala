@@ -59,6 +59,7 @@ class BlockProcessor
       .flatMap( new TxOutputSpenderFlatmap())
       .uid("tx-output-spender-flatmap")
       .name("tx-output-spender")
+      .slotSharingGroup("outputs")
 
     //processedEntries.print()
 
@@ -102,6 +103,7 @@ class BlockProcessor
 
       .uid("sort-and-reduce-obvious-change")
       .name("sort-and-reduce-obvious-change")
+      .slotSharingGroup("accounts")
 
 
 
@@ -154,6 +156,7 @@ class BlockProcessor
       .uid("account-changes")
 
 
+
     /**
       * Compute transaction stack changes
       */
@@ -162,6 +165,7 @@ class BlockProcessor
       .flatMap(new TransactionStackFlatMap())
       .uid("transaction-stack-flatmap")
       .name("transaction-stack-processor")
+      .slotSharingGroup("stacks")
 
 
 
@@ -174,6 +178,7 @@ class BlockProcessor
     //    ctx.consumeTransfers(accountChanges)
 
     //sortedAndReducedChanges.print()
+/*
     val txVolume = sortedAndReducedChanges
       .keyBy(_.height)
       .timeWindow(Time.milliseconds(2))
@@ -192,8 +197,9 @@ class BlockProcessor
           address = "trivial-transaction-volume"
         )
       }
+*/
 
-    ctx.consumeTransfers(accountChanges)
+    ctx.consumeTransfers(accountChanges.map(x=>x).name("test").uid("test"))
     ctx.consumeStackChanges(stackChanges)
 
     //processedTxs.print()

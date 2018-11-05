@@ -29,6 +29,7 @@ import org.apache.kafka.clients.admin.AdminClient
 import org.rocksdb.{BlockBasedTableConfig, BloomFilter, ColumnFamilyOptions, DBOptions}
 import net.santiment.btc.blockprocessor.Types._
 import org.apache.flink.api.java.utils.ParameterTool
+import org.apache.kafka.clients.producer.ProducerConfig
 
 import scala.collection.JavaConverters._
 import scala.util.hashing.MurmurHash3
@@ -174,6 +175,7 @@ class Context(args:Array[String])
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
     // Set paralellism. If config value is undefined we'll use the default paralellism
+
     config.paralellism.foreach(env.setParallelism)
     env
   }
@@ -193,7 +195,7 @@ class Context(args:Array[String])
     // Also the default value for max.fetch.bytes for the Kafka consumer in Flink
     // is 50MB. Since we read from a single partition, before the max fetch size was effectively
     // 1MB
-    properties.setProperty("max.partition.fetch.bytes", "5242880")
+    properties.setProperty("max.partition.fetch.bytes", "52428800")
 
 
     //We use transactions
@@ -239,14 +241,15 @@ class Context(args:Array[String])
     val properties = new Properties()
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
-    properties.setProperty("acks", "all")
+    //properties.setProperty("acks", "all")
     properties.setProperty("batch.size", "5242880")
-    properties.setProperty("linger.ms", "2000")
+    properties.setProperty("linger.ms", "5000")
     // Maximum request size of a single request to Kafka (default is 1MB)
     properties.setProperty("max.request.size", "52428800")
     // Time waiting until for request to be processed. Default is 30s. When we increase request
     // size we'd better increase the timeout as well.
     properties.setProperty("request.timeout.ms", "60000")
+    properties.setProperty("client.id", "transfers-producer")
 
 
     //Write compressed batches to kafka
@@ -281,15 +284,17 @@ class Context(args:Array[String])
       config.topics(0),
       serializationSchema,
       properties,
-      Optional.of(partitioner)
+      Optional.of(partitioner),
+      Semantic.NONE,
+      1
     )
-    producer.setWriteTimestampToKafka(true)
+    //producer.setWriteTimestampToKafka(true)
 
     // We create a uid based on the name of the kafka topic. In this way if we change the topic any old saved state will
     // not affect the new processing
     val uid = s"btc-transfers-kafka-${MurmurHash3.stringHash(config.topics.mkString("")).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid).name("transfers-kafka-sink")
+    stream=>stream.addSink(producer).uid(uid).name("transfers-kafka-sink").slotSharingGroup("transfers-sink").setParallelism(1)
 
   }
 
@@ -302,9 +307,16 @@ class Context(args:Array[String])
     val properties = new Properties()
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
-    properties.setProperty("acks", "all")
+    //properties.setProperty("acks", "all")
     properties.setProperty("batch.size", "5242880")
-    properties.setProperty("linger.ms", "2000")
+    properties.setProperty("linger.ms", "5000")
+    //properties.setProperty("client.id", "account-model-changes-producer")
+
+    properties.setProperty("max.request.size", "52428800")
+    // Time waiting until for request to be processed. Default is 30s. When we increase request
+    // size we'd better increase the timeout as well.
+    properties.setProperty("request.timeout.ms", "60000")
+
 
 
     //Write compressed batches to kafka
@@ -347,15 +359,17 @@ class Context(args:Array[String])
       config.topics(0),
       serializationSchema,
       properties,
-      Optional.of(partitioner)
+      Optional.of(partitioner),
+      Semantic.NONE,
+      1
     )
-    producer.setWriteTimestampToKafka(true)
+    //producer.setWriteTimestampToKafka(true)
 
     // We create a uid based on the name of the kafka topic. In this way if we change the topic any old saved state will
     // not affect the new processing
     val uid = s"btc-stacks-kafka-${MurmurHash3.stringHash(config.topics.mkString("")).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid).name("stacks-sink")
+    stream=>stream.addSink(producer).uid(uid).name("stacks-sink").slotSharingGroup("stacks-sink")
   }
 
   def execute(jobname:String) = {

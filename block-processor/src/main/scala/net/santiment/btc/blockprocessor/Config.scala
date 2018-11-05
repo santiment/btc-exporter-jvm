@@ -64,7 +64,7 @@ class Config(args:Array[String]) {
   def getO(env:String, default:String=null): Option[String] = {
     val prop = env.toLowerCase.replace('_','.')
     (if(props.has(prop)) {
-      Option(computedProps(prop))
+      Option(props.get(prop))
     } else {
       sys.env.get(env).orElse(Option(default)).map(props.get(prop,_))
     })

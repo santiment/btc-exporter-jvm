@@ -110,16 +110,15 @@ lazy val blockprocessor = (project in file("block-processor"))
   .configs(IntegrationTest)
   .settings(
     Defaults.itSettings,
-    name := "block-processor",
+    name := "btc-block-processor",
 
-    version := "1.2.0",
+    version := "2.0.0",
 
     libraryDependencies ++= flinkDependencies
       ++ logging
       ++ jackson
       ++ Seq(
       scalaTest % s"${Test.name},${IntegrationTest.name}",
-      kafka % s"${Test.name},${IntegrationTest.name}",
       bitcoinj
     ),
 
@@ -134,6 +133,46 @@ lazy val blockprocessor = (project in file("block-processor"))
     assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),
 
     assemblyJarName in assembly := "block-processor.jar",
+
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    },
+
+    // make run command include the provided dependencies
+    run in Compile := Defaults.runTask(fullClasspath in Compile,
+      mainClass in (Compile, run),
+      runner in (Compile,run)).evaluated
+  )
+
+lazy val kafkatest = (project in file("kafka-test"))
+  .dependsOn(util)
+  .enablePlugins(BuildInfoPlugin)
+  .configs(IntegrationTest)
+  .settings(
+    Defaults.itSettings,
+    name := "btc-kafka-test",
+
+    version := "1.0.0",
+
+    libraryDependencies ++= flinkDependencies
+      ++ logging
+      ++ jackson
+      ++ Seq(
+      scalaTest % s"${Test.name},${IntegrationTest.name}",
+    ),
+
+    scalacOptions ++= Seq("-target:jvm-1.8", "-unchecked", "-deprecation", "-feature"),
+
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+
+    buildInfoPackage := "net.santiment.kafkatest",
+
+
+    //exclude Scala library from assembly
+    assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),
+
+    assemblyJarName in assembly := "kafka-test.jar",
 
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", xs @ _*) => MergeStrategy.discard

@@ -2,7 +2,7 @@ import sbt._
 
 object Dependencies {
   lazy val SCALA_VERSION = "2.11.8"
-  lazy val KAFKA_VERSION = "1.1.1" //sys.env("KAFKA_VERSION")
+  lazy val KAFKA_VERSION = "0.11.0.3" //sys.env("KAFKA_VERSION")
   lazy val ZOOKEEPER_VERSION = "3.4.12" //sys.env("ZOOKEEPER_VERSION")
   lazy val FLINK_VERSION = "1.6.0"
 
