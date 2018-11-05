@@ -59,7 +59,7 @@ class BlockProcessor
       .flatMap( new TxOutputSpenderFlatmap())
       .uid("tx-output-spender-flatmap")
       .name("tx-output-spender")
-      .slotSharingGroup("outputs")
+      //.slotSharingGroup("outputs")
 
     //processedEntries.print()
 
@@ -103,7 +103,7 @@ class BlockProcessor
 
       .uid("sort-and-reduce-obvious-change")
       .name("sort-and-reduce-obvious-change")
-      .slotSharingGroup("accounts")
+      //.slotSharingGroup("accounts")
 
 
 
@@ -165,7 +165,7 @@ class BlockProcessor
       .flatMap(new TransactionStackFlatMap())
       .uid("transaction-stack-flatmap")
       .name("transaction-stack-processor")
-      .slotSharingGroup("stacks")
+      //.slotSharingGroup("stacks")
 
 
 
@@ -199,7 +199,7 @@ class BlockProcessor
       }
 */
 
-    ctx.consumeTransfers(accountChanges.map(x=>x).name("test").uid("test"))
+    ctx.consumeTransfers(accountChanges)
     ctx.consumeStackChanges(stackChanges)
 
     //processedTxs.print()

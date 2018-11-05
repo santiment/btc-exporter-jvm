@@ -242,10 +242,12 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     //properties.setProperty("acks", "all")
-    properties.setProperty("batch.size", "5242880")
+    properties.setProperty("batch.size", "524288")
+    //properties.setProperty("batch.size", "65536")
+    //properties.setProperty("batch.size", "5242880")
     properties.setProperty("linger.ms", "5000")
     // Maximum request size of a single request to Kafka (default is 1MB)
-    properties.setProperty("max.request.size", "52428800")
+    //properties.setProperty("max.request.size", "52428800")
     // Time waiting until for request to be processed. Default is 30s. When we increase request
     // size we'd better increase the timeout as well.
     properties.setProperty("request.timeout.ms", "60000")
@@ -284,9 +286,7 @@ class Context(args:Array[String])
       config.topics(0),
       serializationSchema,
       properties,
-      Optional.of(partitioner),
-      Semantic.NONE,
-      1
+      Optional.of(partitioner)
     )
     //producer.setWriteTimestampToKafka(true)
 
@@ -294,7 +294,7 @@ class Context(args:Array[String])
     // not affect the new processing
     val uid = s"btc-transfers-kafka-${MurmurHash3.stringHash(config.topics.mkString("")).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid).name("transfers-kafka-sink").slotSharingGroup("transfers-sink").setParallelism(1)
+    stream=>stream.addSink(producer).uid(uid).name("transfers-kafka-sink")
 
   }
 
@@ -308,15 +308,16 @@ class Context(args:Array[String])
 
     properties.setProperty("bootstrap.servers", config.bootstrapServers)
     //properties.setProperty("acks", "all")
-    properties.setProperty("batch.size", "5242880")
+    properties.setProperty("batch.size", "524288")
+    //properties.setProperty("batch.size", "65536")
+    //properties.setProperty("batch.size", "5242880")
     properties.setProperty("linger.ms", "5000")
-    //properties.setProperty("client.id", "account-model-changes-producer")
+    properties.setProperty("client.id", "account-model-changes-producer")
 
-    properties.setProperty("max.request.size", "52428800")
+    //properties.setProperty("max.request.size", "52428800")
     // Time waiting until for request to be processed. Default is 30s. When we increase request
     // size we'd better increase the timeout as well.
     properties.setProperty("request.timeout.ms", "60000")
-
 
 
     //Write compressed batches to kafka
@@ -359,9 +360,7 @@ class Context(args:Array[String])
       config.topics(0),
       serializationSchema,
       properties,
-      Optional.of(partitioner),
-      Semantic.NONE,
-      1
+      Optional.of(partitioner)
     )
     //producer.setWriteTimestampToKafka(true)
 
@@ -369,7 +368,7 @@ class Context(args:Array[String])
     // not affect the new processing
     val uid = s"btc-stacks-kafka-${MurmurHash3.stringHash(config.topics.mkString("")).toHexString}"
 
-    stream=>stream.addSink(producer).uid(uid).name("stacks-sink").slotSharingGroup("stacks-sink")
+    stream=>stream.addSink(producer).uid(uid).name("stacks-sink")
   }
 
   def execute(jobname:String) = {
