@@ -90,6 +90,7 @@ services:
       CHECKPOINT_DATA_URI: file:///app/output/checkpoints
       FEATURE_STACKS:
       FEATURE_TRANSFERS:
+      DEBUG:
 
   rawexporter:
     build:

@@ -1,7 +1,5 @@
 package net.santiment.btc.blockprocessor
 
-import org.apache.flink.api.common.typeinfo.TypeInformation
-import org.apache.flink.api.scala._
 import org.bitcoinj.core.{Coin, TransactionOutPoint, TransactionOutput}
 import org.bitcoinj.script.Script
 

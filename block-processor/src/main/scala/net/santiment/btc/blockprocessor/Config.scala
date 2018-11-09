@@ -56,7 +56,6 @@ case class Features
 
 class Config(args:Array[String]) {
 
-
   lazy val props: ParameterTool = ParameterTool.fromArgs(args)
 
   lazy val computedProps: mutable.Map[String, String] = mutable.Map[String,String]()
@@ -75,6 +74,8 @@ class Config(args:Array[String]) {
   }
 
   def get(env:String, default:String = null):String = getO(env,default).get
+
+  lazy val debug: Boolean = get("DEBUG","false").toBoolean
 
   lazy val flink = FlinkConfig(
 

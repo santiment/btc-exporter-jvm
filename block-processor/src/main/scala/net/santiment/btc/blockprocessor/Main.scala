@@ -1,7 +1,6 @@
 package net.santiment.btc.blockprocessor
 
 import com.typesafe.scalalogging.LazyLogging
-import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
 import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.apache.flink.streaming.api.watermark.Watermark
@@ -9,9 +8,6 @@ import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.Window
 import org.apache.flink.util.Collector
 import org.bitcoinj.core.Coin
-
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 class BlockProcessor
 (
@@ -29,21 +25,37 @@ class BlockProcessor
     // Parse and extract the inputs and outputs from each block. This is the only operation which cannot be parallelised
     // with the current algorithm. However it requires no state, so it should go pretty fast.
     val unprocessedEntries = ctx.rawBlockSource
+      .keyBy(_=>1)
       .flatMap(new RawBlockParserFlaMap())
       .uid("block-parser-flatmap")
       .name("block-parser")
       .setParallelism(1)
-      .assignTimestampsAndWatermarks( new AssignerWithPunctuatedWatermarks[UnmatchedTxEntry] with LazyLogging {
+      .assignTimestampsAndWatermarks( new AssignerWithPunctuatedWatermarks[UnmatchedTxEntry]
+        with LazyLogging {
+
+        var lastWatermark: Long = 0
+        var lastTimestamp: Long = 0
+
         override def checkAndGetNextWatermark(lastElement: UnmatchedTxEntry, extractedTimestamp: Long): Watermark = {
-          if(lastElement.key.isEmpty)
+          if(lastElement.key.isEmpty) {
             // This is the last tx for this block. We emit a watermark here. We assume that the timestamp of the next
             // block will be at least 1 second bigger. Otherwise there could be problems
-            new Watermark(extractedTimestamp+999)
+            val newWm = extractedTimestamp + 500
+            if (lastWatermark >= newWm) {
+              logger.error(s"BAD WATERMARK: old $lastWatermark, new $newWm")
+            }
+            lastWatermark = newWm
+            new Watermark(newWm)
+          }
           else
             null
         }
 
         override def extractTimestamp(element: UnmatchedTxEntry, previousElementTimestamp: Long): Long = {
+          if(lastTimestamp > element.ts * 1000 ) {
+            logger.error(s"BAD TIMESTAMP: ${element.height}, ${element.txPos}, ${element.ts * 1000}, $lastTimestamp")
+          }
+          lastTimestamp = element.ts * 1000
           element.ts * 1000 //Timestamps are given in seconds so we need to convert to ms
         }
       })
@@ -59,9 +71,7 @@ class BlockProcessor
       .flatMap( new TxOutputSpenderFlatmap())
       .uid("tx-output-spender-flatmap")
       .name("tx-output-spender")
-      //.slotSharingGroup("outputs")
 
-    //processedEntries.print()
 
     /**
       * Sort account changes for each account within each block. Also reduce entries which have both input
@@ -103,44 +113,6 @@ class BlockProcessor
 
       .uid("sort-and-reduce-obvious-change")
       .name("sort-and-reduce-obvious-change")
-      //.slotSharingGroup("accounts")
-
-
-
-
-/*
-    // Convert processed transactions to list of account changes. Output first the inputs, then the outputs.
-
-    def extractAccountChanges(txs: DataStream[ProcessedTx]):DataStream[AccountChange] = {
-      txs.flatMap { tx =>
-        val inputs = tx.inputs.zipWithIndex.map { case (entry, index) =>
-          AccountChange(
-            in = true,
-            ts = tx.ts,
-            height = tx.height,
-            txPos = tx.txPos,
-            index = index,
-            value = Coin.valueOf(entry.value).negate().toPlainString.toDouble,
-            address = entry.address
-          )
-        }
-
-        val outputs = tx.outputs.zipWithIndex.map { case (entry, index) =>
-          AccountChange(
-            in = false,
-            ts = tx.ts,
-            height = tx.height,
-            txPos = tx.txPos,
-            index = index,
-            value = Coin.valueOf(entry.value).toPlainString.toDouble,
-            address = entry.address
-          )
-        }
-        inputs ++ outputs
-      }
-    }
-*/
-
 
     val accountChanges:DataStream[AccountChange] = sortedAndReducedChanges.map { in =>
       AccountChange(
@@ -165,45 +137,19 @@ class BlockProcessor
       .flatMap(new TransactionStackFlatMap())
       .uid("transaction-stack-flatmap")
       .name("transaction-stack-processor")
-      //.slotSharingGroup("stacks")
 
-
-
-    //stackChanges.print()
     //Compute token circulation
     //TODO
-
-
-    //Send to the kafka sink
-    //    ctx.consumeTransfers(accountChanges)
-
-    //sortedAndReducedChanges.print()
-/*
-    val txVolume = sortedAndReducedChanges
-      .keyBy(_.height)
-      .timeWindow(Time.milliseconds(2))
-      .reduce { (left, right)=>
-        //System.out.println(s"s left: ${left}, right: ${right}")
-        var total = 0L
-        if(left.value < 0)
-          total += left.value
-        if(right.value < 0)
-          total += right.value
-        ReducedAccountChange(
-          ts = left.ts,
-          height = left.height,
-          txPos = -1,
-          value = total,
-          address = "trivial-transaction-volume"
-        )
-      }
-*/
 
     ctx.consumeTransfers(accountChanges)
     ctx.consumeStackChanges(stackChanges)
 
-    //processedTxs.print()
-
+    if(ctx.config.debug) {
+      accountChanges.print()
+      stackChanges.print()
+      sortedAndReducedChanges.print()
+      processedEntries.print()
+    }
 
     ctx.execute("btc-block-processor")
   }
