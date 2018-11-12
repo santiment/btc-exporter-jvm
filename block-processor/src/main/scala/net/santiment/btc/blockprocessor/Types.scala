@@ -16,7 +16,7 @@ case class RawBlock(height:Int, bytes: ByteArray)
   * @param value -- amount of row in BTC. It is negative for inputs and positive for outputs
   * @param address -- address affected by this change
   *
-  * The combination of (in, height, txPos, index) is an unique key
+  * The combination of (height, txPos, address) is an unique key
   */
 case class AccountChange
 (

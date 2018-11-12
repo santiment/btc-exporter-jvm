@@ -61,6 +61,10 @@ with LazyLogging {
     //If this is an input - spend the corresponding output and emit the corresponding account change
     else {
       val output = utxo.value()
+      utxo.update(null)
+      if (output == null) {
+        throw new IllegalStateException(s"UTXO NOT FOUND: ${value.height}, ${value.ts}, ${value.txPos}, output index: ${value.key.get.index}")
+      }
 
       out.collect(ReducedAccountChange(
         ts = value.ts,
