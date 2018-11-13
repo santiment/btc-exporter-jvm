@@ -11,7 +11,7 @@ import org.apache.flink.api.scala._
 
 import scala.collection.JavaConverters._
 
-class RawBlockParserFlaMap extends RichFlatMapFunction[RawBlock, UnmatchedTxEntry]
+class RawBlockParserFlatMap extends RichFlatMapFunction[RawBlock, UnmatchedTxEntry]
 with LazyLogging
 {
   @transient private var lastTimestamp: ValueState[java.lang.Long] = _

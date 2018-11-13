@@ -26,7 +26,7 @@ class BlockProcessor
     // with the current algorithm. However it requires no state, so it should go pretty fast.
     val unprocessedEntries = ctx.rawBlockSource
       .keyBy(_=>1)
-      .flatMap(new RawBlockParserFlaMap())
+      .flatMap(new RawBlockParserFlatMap())
       .uid("block-parser-flatmap")
       .name("block-parser")
       .setParallelism(1)
