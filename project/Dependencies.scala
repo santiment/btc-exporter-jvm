@@ -2,15 +2,21 @@ import sbt._
 
 object Dependencies {
   lazy val SCALA_VERSION = "2.11.8"
-  lazy val KAFKA_VERSION = "1.1.0" //sys.env("KAFKA_VERSION")
+  lazy val KAFKA_VERSION = "0.11.0.3" //sys.env("KAFKA_VERSION")
   lazy val ZOOKEEPER_VERSION = "3.4.12" //sys.env("ZOOKEEPER_VERSION")
   lazy val FLINK_VERSION = "1.6.0"
 
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.0.5"
 
-  lazy val kafka = ("org.apache.kafka" % "kafka-clients" % KAFKA_VERSION)
+  lazy val kafkaClients = ("org.apache.kafka" % "kafka-clients" % KAFKA_VERSION)
     .exclude("log4j", "log4j")
     .exclude("org.slf4j", "slf4j-log4j12")
+
+  //This is kafka itself. Used for testing
+  lazy val kafka = ("org.apache.kafka" %% "kafka" % KAFKA_VERSION)
+    .exclude("log4j", "log4j")
+    .exclude("org.slf4j", "slf4j-log4j12")
+
 
   lazy val jsonrpc = "com.github.briandilley.jsonrpc4j" % "jsonrpc4j" % "1.5.3"
 

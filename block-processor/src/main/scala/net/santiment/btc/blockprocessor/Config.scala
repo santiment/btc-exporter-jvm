@@ -4,10 +4,13 @@ import java.time.Duration
 
 import org.apache.flink.api.java.utils.ParameterTool
 
+import scala.collection.mutable
+
 case class KafkaTopicConfig
 (
   bootstrapServers: String,
-  topic: String
+  topics: Array[String],
+  numPartitions: Option[Int]
 )
 
 case class MigrationConfig
@@ -28,13 +31,15 @@ case class FlinkConfig
   externalizedCheckpointsEnabled: Boolean,
   maxNumberOfRestartsInInterval: Int,
   restartsInterval: Duration,
-  delayBetweenRestarts: Duration
+  delayBetweenRestarts: Duration,
+  paralellism: Option[Int]
 )
 
 sealed trait RocksDBProfile
 case object CurrentJob extends RocksDBProfile {}
 case class HistoricalJob
 (
+  blockSize: Long,
   blockCacheSizeMb: Long,
   parallelism: Int,
   writeBufferSizeMb: Long,
@@ -42,21 +47,35 @@ case class HistoricalJob
   minWriteBufferNumberToMerge: Int
 ) extends RocksDBProfile {}
 
+case class Features
+(
+  transfers: Boolean,
+  stackChanges: Boolean
+)
+
 
 class Config(args:Array[String]) {
 
   lazy val props: ParameterTool = ParameterTool.fromArgs(args)
 
+  lazy val computedProps: mutable.Map[String, String] = mutable.Map[String,String]()
+
   def getO(env:String, default:String=null): Option[String] = {
     val prop = env.toLowerCase.replace('_','.')
-    if(props.has(prop)) {
+    (if(props.has(prop)) {
       Option(props.get(prop))
     } else {
-      sys.env.get(env).orElse(Option(default)).map {dflt=> props.get(prop,dflt)}
-    }
+      sys.env.get(env).orElse(Option(default)).map(props.get(prop,_))
+    })
+      .map { res =>
+        computedProps(prop) = res
+        res
+      }
   }
 
   def get(env:String, default:String = null):String = getO(env,default).get
+
+  lazy val debug: Boolean = get("DEBUG","false").toBoolean
 
   lazy val flink = FlinkConfig(
 
@@ -76,18 +95,28 @@ class Config(args:Array[String]) {
       get("RESTARTS_INTERVAL_S","3600").toInt),
 
     delayBetweenRestarts = Duration.ofSeconds(
-      get("DELAY_BETWEEN_RESTARTS_S","300").toInt)
+      get("DELAY_BETWEEN_RESTARTS_S","300").toInt),
+
+    paralellism = getO("PARALELLISM").map(_.toInt)
   )
 
   lazy val rawBlockTopic = KafkaTopicConfig(
     //We support different Kafka clusters for the input and output topics in this way
     getO("KAFKA_RAW_BLOCK_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
-    get("KAFKA_RAW_BLOCK_TOPIC", "btc-raw-blocks")
+    get("KAFKA_RAW_BLOCK_TOPIC", "btc-raw-blocks").split(','),
+    None
   )
 
   lazy val transfersTopic = KafkaTopicConfig(
     getO("KAFKA_TRANSFERS_URL").orElse(getO("KAFKA_URL","localhost:9092")).get,
-    get("KAFKA_TRANSFERS_TOPIC", "btc-transfers")
+    get("KAFKA_TRANSFERS_TOPICS", "btc-transfers").split(','),
+    getO("KAFKA_TRANSFERS_NUM_BROKERS").orElse(getO("KAFKA_NUM_BROKERS","1")).map(_.toInt)
+  )
+
+  lazy val stacksTopic = KafkaTopicConfig(
+    getO("KAFKA_STACKS_URL").orElse(getO("KAFKA_URL", "localhost:9092")).get,
+    get("KAFKA_STACKS_TOPICS", "btc-stacks").split(','),
+    getO("KAFKA_STACKS_NUM_BROKERS").orElse(getO("KAFKA_NUM_BROKERS", "1")).map(_.toInt)
   )
 
   lazy val migrations = MigrationConfig(
@@ -100,14 +129,19 @@ class Config(args:Array[String]) {
   lazy val profile: RocksDBProfile = get("ROCKSDB_PROFILE","current") match {
     case "current" => CurrentJob
     case "historical" => HistoricalJob(
-      get("ROCKSDB_BLOCK_CACHE_SIZE_MB","4096").toLong,
-      get("ROCKSDB_PARALLELISM", "8").toInt,
-      get("ROCKSDB_WRITE_BUFFER_SIZE_MB","256").toLong,
-      get("ROCKSDB_MAX_WRITE_BUFFER_NUMBER", "5").toInt,
-      get("ROCKSDB_MIN_WRITE_BUFFER_NUMBER_TO_MERGE","2").toInt
+      blockSize = get("ROCKSDB_BLOCK_SIZE", "32768").toLong,
+      blockCacheSizeMb = get("ROCKSDB_BLOCK_CACHE_SIZE_MB", "256").toLong,
+      parallelism = get("ROCKSDB_PARALLELISM", "8").toInt,
+      writeBufferSizeMb = get("ROCKSDB_WRITE_BUFFER_SIZE_MB", "16").toLong,
+      maxWriteBufferNumber = get("ROCKSDB_MAX_WRITE_BUFFER_NUMBER", "5").toInt,
+      minWriteBufferNumberToMerge = get("ROCKSDB_MIN_WRITE_BUFFER_NUMBER_TO_MERGE", "4").toInt
     )
     case x =>
       throw new IllegalArgumentException(s"Unknown profile: $x")
   }
 
+  lazy val features =  Features(
+    transfers = get("FEATURE_TRANSFERS", "true").toBoolean,
+    stackChanges = get("FEATURE_STACKS", default ="false").toBoolean
+  )
 }

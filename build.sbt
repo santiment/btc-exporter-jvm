@@ -5,7 +5,7 @@ import sbtassembly.AssemblyPlugin.defaultUniversalScript
 
 ThisBuild / organization := "net.santiment"
 ThisBuild / scalaVersion := SCALA_VERSION
-ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / version := "1"
 
 ThisBuild / resolvers  ++=Seq(
   "Apache Development Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots/",
@@ -35,7 +35,7 @@ lazy val oldexporter = (project in file("old-exporter"))
       jsonrpc,
       bitcoinj,
       zookeeper,
-      kafka
+      kafkaClients
     ) ++ logging ++ curatorLibs ++ jackson,
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
@@ -67,7 +67,7 @@ lazy val util = (project in file("util"))
 
     libraryDependencies ++= Seq (
       scalaLogging,
-      kafka,
+      kafkaClients,
       zookeeper
     ) ++ curatorLibs
   )
@@ -89,7 +89,7 @@ lazy val rawexporter = (project in file("raw-exporter"))
       jsonrpc,
       bitcoinj,
       zookeeper,
-      kafka
+      kafkaClients
     ) ++ logging ++ curatorLibs ++ jackson,
 
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
@@ -110,7 +110,9 @@ lazy val blockprocessor = (project in file("block-processor"))
   .configs(IntegrationTest)
   .settings(
     Defaults.itSettings,
-    name := "block-processor",
+    name := "btc-block-processor",
+
+    version := "2.0.0",
 
     libraryDependencies ++= flinkDependencies
       ++ logging
@@ -143,6 +145,43 @@ lazy val blockprocessor = (project in file("block-processor"))
       runner in (Compile,run)).evaluated
   )
 
+lazy val kafkatest = (project in file("kafka-test"))
+  .dependsOn(util)
+  .enablePlugins(BuildInfoPlugin)
+  .configs(IntegrationTest)
+  .settings(
+    Defaults.itSettings,
+    name := "btc-kafka-test",
+
+    version := "1.0.0",
+
+    libraryDependencies ++= flinkDependencies
+      ++ logging
+      ++ jackson
+      ++ Seq(
+      scalaTest % s"${Test.name},${IntegrationTest.name}",
+    ),
+
+    scalacOptions ++= Seq("-target:jvm-1.8", "-unchecked", "-deprecation", "-feature"),
+
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+
+    buildInfoPackage := "net.santiment.kafkatest",
 
 
+    //exclude Scala library from assembly
+    assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),
+
+    assemblyJarName in assembly := "kafka-test.jar",
+
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    },
+
+    // make run command include the provided dependencies
+    run in Compile := Defaults.runTask(fullClasspath in Compile,
+      mainClass in (Compile, run),
+      runner in (Compile,run)).evaluated
+  )
 

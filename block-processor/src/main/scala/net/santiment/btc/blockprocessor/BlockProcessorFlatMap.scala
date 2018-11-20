@@ -14,7 +14,7 @@ import org.bitcoinj.script.Script
 import collection.JavaConverters._
 
 class BlockProcessorFlatMap
-  extends RichFlatMapFunction[RawBlock, AccountChange]()
+  extends RichFlatMapFunction[RawBlock, ProcessedTx]()
     with LazyLogging {
 
   /**
@@ -98,7 +98,7 @@ class BlockProcessorFlatMap
     * @param value
     * @param out
     */
-  override def flatMap(value: RawBlock, out: Collector[AccountChange]): Unit = {
+  override def flatMap(value: RawBlock, out: Collector[ProcessedTx]): Unit = {
     logger.trace(s"Processing block ${value.height}")
     // 1. Deserialize block
 
@@ -115,6 +115,7 @@ class BlockProcessorFlatMap
     var blockFees = 0L
 
     logger.trace(s"Processing coinbase tx")
+    val coinbaseOutputs = new Array[TxEntry](coinbase._1.getOutputs.size())
     coinbase._1.getOutputs.asScala.zipWithIndex.foreach { case (output, index) =>
 
       //The following check is due to tx 59e7532c046ed825683306d6498d886209de02d412dd3f1dc55c55f87ea1c516
@@ -133,18 +134,19 @@ class BlockProcessorFlatMap
       logger.trace("storing")
       storeOutput(output)
 
-      logger.trace("emitting")
-      out.collect(AccountChange(
-        in = false, // debit
-        ts = block.getTimeSeconds,
-        height = height,
-        txPos = 0, //coinbase tx is at position 0,
-        index = index,
-        value = value.toPlainString.toDouble,
-        address = account.getOrElse(BitcoinAddress.nullAddress).address
-      ))
+      coinbaseOutputs(index) = TxEntry(
+        address = account.getOrElse(BitcoinAddress.nullAddress).address,
+        value = value.value
+      )
     }
 
+    out.collect(ProcessedTx(
+      ts = ts,
+      height = height,
+      txPos = 0,
+      inputs = new Array(0),
+      outputs = coinbaseOutputs
+    ))
 
     //3. Process non-coinbase transactions
     logger.trace(s"Processing non-coinbase txs")
@@ -153,7 +155,10 @@ class BlockProcessorFlatMap
       var totalDebit = 0L
       var totalCredit = 0L
 
-      //3.1 Spend and emit all inputs
+      val inputs = new Array[TxEntry](tx.getInputs.size())
+      val outputs = new Array[TxEntry](tx.getOutputs.size())
+
+      //3.1 Spend and all inputs
       tx.getInputs.asScala.zipWithIndex.foreach { case (input, index) =>
 
         val output = spend(input.getOutpoint)
@@ -162,19 +167,14 @@ class BlockProcessorFlatMap
 
         totalCredit += value.getValue
 
-        out.collect(AccountChange(
-          in = true, // credit
-          ts = block.getTimeSeconds,
-          height = height,
-          txPos = txPos,
-          index = index,
-          //Credits are recoded with negative values
-          value = value.negate().toPlainString.toDouble,
+        inputs(index) = TxEntry(
+          value = value.value,
           address = account.address
-        ))
+
+        )
       }
 
-      //3.2 Store and emit all outputs
+      //3.2 Store and all outputs
       tx.getOutputs.asScala.zipWithIndex.foreach { case (output, index) =>
 
         //The following check is due to tx ebc9fa1196a59e192352d76c0f6e73167046b9d37b8302b6bb6968dfd279b767
@@ -192,36 +192,39 @@ class BlockProcessorFlatMap
 
         storeOutput(output)
 
-        out.collect(AccountChange(
-          in = false, // debit
-          ts = block.getTimeSeconds,
-          height = height,
-          txPos = txPos,
-          index = index,
-          //Debits are recorded with positive values
-          value = value.toPlainString.toDouble,
-          address = account.getOrElse(BitcoinAddress.nullAddress).address
-        ))
+        outputs(index) = TxEntry(
+          address = account.getOrElse(BitcoinAddress.nullAddress).address,
+          value = value.value
+        )
       }
 
       //3.3 Count fee
       val fee = totalCredit - totalDebit
       blockFees += fee
+
+      //3.4. Emit the resulting processed transaction
+      out.collect(ProcessedTx(
+        ts = ts,
+        height = height,
+        txPos = txPos,
+        inputs = inputs,
+        outputs = outputs
+      ))
     }
 
     //4. Emit coinbase account change - equal to number of minted coins
     logger.trace("Processing fees")
     val coinbaseCredit = Coin.valueOf(minerReward - blockFees)
 
-    out.collect(AccountChange(
-      in = true, // credit
-      ts = block.getTimeSeconds,
+    out.collect(ProcessedTx(
+      ts = ts,
       height = height,
-      txPos = txs.size, //virtual tx
-      index = 0,
-      //Credits are recorded with negative values
-      value = coinbaseCredit.negate.toPlainString.toDouble,
-      address = "mint"
+      txPos = txs.size,
+      inputs = Array(TxEntry(
+        address = "mint",
+        value = coinbaseCredit.value
+      )),
+      outputs = new Array(0)
     ))
   }
 }
