@@ -1,8 +1,8 @@
 package net.santiment.btc.blockprocessor
 
 import java.nio.charset.StandardCharsets
-import java.util.{Optional, Properties}
 import java.util.concurrent.TimeUnit
+import java.util.{Optional, Properties}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -15,21 +15,18 @@ import org.apache.flink.api.common.ExecutionConfig
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.contrib.streaming.state.{OptionsFactory, PredefinedOptions, RocksDBStateBackend}
 import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedCheckpointCleanup
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer011.Semantic
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer011, FlinkKafkaProducer011}
 import org.apache.flink.streaming.util.serialization.{KeyedDeserializationSchema, KeyedSerializationSchema}
 import org.apache.kafka.clients.admin.AdminClient
 import org.rocksdb.{BlockBasedTableConfig, BloomFilter, ColumnFamilyOptions, DBOptions}
-import net.santiment.btc.blockprocessor.Types._
-import org.apache.flink.api.java.utils.ParameterTool
-import org.apache.kafka.clients.producer.ProducerConfig
 
 import scala.collection.JavaConverters._
 import scala.util.hashing.MurmurHash3
@@ -97,7 +94,28 @@ class Context(args:Array[String])
 
     profile match {
       case CurrentJob =>
-        result.setPredefinedOptions(PredefinedOptions.FLASH_SSD_OPTIMIZED)
+        result.setOptions( new OptionsFactory {
+          override def createDBOptions(currentOptions: DBOptions): DBOptions = {
+            //Those are the predefined FLASH_SSD_OPTIMIZED options
+            new DBOptions()
+              .setIncreaseParallelism(4)
+              .setUseFsync(false)
+              .setMaxOpenFiles(-1)
+          }
+
+          override def createColumnOptions(currentOptions: ColumnFamilyOptions): ColumnFamilyOptions = {
+            currentOptions.tableFormatConfig()
+            new ColumnFamilyOptions()
+              .setOptimizeFiltersForHits(true)
+              .setTableFormatConfig(
+              new BlockBasedTableConfig()
+                .setBlockCacheSize(1024*1024) //1MB block cache
+                .setBlockSize(32768)
+                .setCacheIndexAndFilterBlocks(true)
+              )
+          }
+        })
+
 
       case conf:HistoricalJob =>
         //We need a lot of cache to process the records fast
