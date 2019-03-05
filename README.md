@@ -28,6 +28,18 @@ docker-compose build sbt
 docker-compose run sbt
 ```
 
+There are different projects for the exporter and for the block processor. To work on the exporter use in sbt:
+
+``` sbt
+project rawexporter
+```
+
+To switch to the block processor use
+
+``` sbt
+project blockprocessor
+```
+
 ## Testing
 
 ### Unit tests
@@ -53,25 +65,12 @@ it:test
 Similarly you can call `~it:test` to rerun tests on file change.
 
 
-
 ## Environment variables
 The build process depends on some parameters which are given to sbt
 using environment variables. To ease development you can use a `.env`
 file. During the build process all variables in the .env file will be
 put in the environment.
 
-
-## Building
-
-(OUTDATED)
-
-To build the final docker image use
-
-``` sh
-$ docker build --target rawexporter -t localhst/btc-exporter-jvm .
-```
-
-This will build the image and publish it locally.
 
 ## CI/CD
 
@@ -80,65 +79,3 @@ integration tests. The tests are run using the docker-compose file
 `compose-test.yml` This file describes all the services that need to
 be set-up during the integration tests
 
-## Operations
-
-(OUTDATED)
-
-This program reads Bitcoin blocks from the `bitcoind` server and
-writes data to Kafka. It uses Zookeeper to keep track of the last
-processed block. We try to keep exactly-once semantics. This means
-that every block will be processed and the data will be written to
-Kafka exactly one time - there will be no missing data and no
-duplicated messages. To achieve this guarantee the process uses a
-certain commit procedure which guarantees that either data will be
-written exactly once in Kafka or the process will fail to start.
-
-If the commit procedure fails somehow the process will fail with the message: `Inconsistent state: written=$written, committed=$committed`. To fix that one has to perform the following procedure:
-
-1) Check the kafka topic and see what is the number of the last block written there. One can do that with:
-
-``` sh
-$ kafka-console-consumer.sh --bootstrap-server $KAFKA_URL --topic btc-transfers-1 --partition 0 --offset LASTOFFSET--isolation-level read_committed 
-
-```
-
-To get an offset close to the last one run
-
-``` sh
-bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list $KAFKA_URL --topic btc-transfers-1
-```
-
-Then for LASTOFFSET choose the given offset - 100
-
-2) Check the values of the zookeeper variables that keep the last block. The easiest way to do this is with sbt
-
-``` sh
-$ docker-compose run -e ZOOKEEPER_URL=url-to-zookeeper sbt sbt console
-
-scala>
-```
-
-This will start the scala interpreter. Then do
-
-``` scala
-scala> import net.santiment.Globals._
-
-scala> lastWrittenHeightStore.read
-res2: Option[Int] = Some(1233)
-
-scala> lastCommittedHeightStore.read
-res3: Option[Int] = Some(1232)
-```
-
-If there was a problem the values of `lastWrittenHeightStore` and `lastCommittedHeightStore` should differ by 1.
-
-3) Change the value in Zookeeper.
-
-According to the last block height written in Kafka you would either have to increase `lastCommittedHeightStore` or to decrease `lastWrittenHeightStore` by 1. For example:
-
-``` scala
-scala> lastCommittedHeightStore.update(1233)
-```
-
-
-After the two values have been made equal you can safely restart the btc-exporter.
