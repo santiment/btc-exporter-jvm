@@ -2,19 +2,14 @@ package net.santiment
 
 import com.typesafe.scalalogging.LazyLogging
 import net.santiment.btc.rawexporter.BuildInfo
-import net.santiment.util.Migrator
-import org.apache.kafka.common.KafkaException
+import org.apache.kafka.clients.consumer.ConsumerRecords
+import org.apache.kafka.common.{KafkaException, TopicPartition}
+
+import collection.JavaConverters._
 
 class BitcoinKafkaProducer
 (
-  world : {
-    val config: Config
-    val bitcoinClient: BitcoinClient
-    val lastBlockStore: TransactionalStore[Int]
-    val sink: TransactionalSink[ByteArray]
-    def closeEverythingQuietly (): Unit
-    val migrator: Migrator
-  }
+  world : Globals
 )
   extends LazyLogging
 {
@@ -22,58 +17,75 @@ class BitcoinKafkaProducer
   var sinkCommitted = false
 
   def processBlock(height: Int): Unit = {
-    logger.debug(s"current_block=$height, begin_process")
-    val block = world.bitcoinClient.getRawBlock(height)
-
-      world.sink.send(height.toString, block)
-      logger.trace(s"sent")
-  }
-
-  def makeTxProcessor[T](lastBlock:TransactionalStore[Int], sink:TransactionalSink[T], processor: Int =>Unit)(height:Int): Unit = {
-    //Start a new transaction
+    val sink = world.sink
     sink.begin()
     logger.trace(s"current_block=$height, begin_transaction")
-    lastBlock.begin()
-
-    //Process the current block and send the resulting records to Kafka
-    processor(height)
-    //sink.flush()
-
-    /**
-      * Here starts the critical section for committing the data. First we record that all records have been sent to kafka, by updating
-      * the last written block. From this moment on until the end, the last written and the last committed block differ. If anything happens
-      * and the program crashes unexpectedly we will know it and will refuse to restart next time, since the state might have become inconsistent.
-      * This algorithm guarantees that we won't get duplicated records in Kafka - either everything will work fine, or the program will crash in a
-      * way which requires human intervention.
-      */
-
-    //Update is better than write, since writes do reads to see if the object exists in Zookeeper
-    lastBlock.update(height)
+    val block = world.bitcoinClient.getRawBlock(height)
+    sink.send(height.toString, block)
+    logger.trace(s"sent")
     try {
-      sinkCommitted = false
       sink.commit()
-      sinkCommitted = true
-      // If the process gets terminated here we will try to commit the last block to Zookeeper during shutdown
-      lastBlock.commit()
-      sinkCommitted = false
     } catch {
       case e:KafkaException =>
         logger.error(s"Exception while committing block $height")
         sink.abort()
-
-        //Revert the last written block to its previous value. After restarting the client we will be able to continue normally
-        lastBlock.abort()
         throw e
       case e:Throwable =>
-        if(!sinkCommitted) {
-          lastBlock.abort()
-        }
         logger.error(s"Unhandled exception while committing block $height")
         throw e
     }
   }
 
-  lazy val txProcess: Int => Unit = makeTxProcessor(world.lastBlockStore, world.sink, processBlock)
+  def lastProcessedBlockHeight(): Int = {
+    /**
+      * Returns the last committed block height on the blocks topic
+      */
+    val partition = new TopicPartition(world.config.kafkaTopic,0)
+    val partitionList = List(partition).asJava
+
+    val consumer = world.consumer
+    consumer.assign(List(partition).asJava)
+
+    // Seek to the first commit after the last committed topic and then get the position
+    // Get first position to read
+    consumer.seekToBeginning(partitionList)
+    val min_offset = consumer.position(partition)
+    logger.debug(s"kafka-topic min offset: $min_offset")
+
+    // Get last position to read
+    consumer.seekToEnd(partitionList)
+    val max_offset = consumer.position(partition)
+    logger.debug(s"kafka-topic max offset: $max_offset")
+
+    var offset = max_offset - 1
+    var height = 0
+
+    while(offset >= min_offset && height == 0) {
+      logger.debug(s"testing offset $offset")
+      consumer.seek(partition, offset)
+      // Sometimes the following poll returns empty record, even though it should have returned something. When that
+      // happens offset is decreased by 1. Due to this issue it might happen that the first consumed record in our loop
+      // is not actually the last record in the topic.
+      var result = consumer.poll(1000)
+      logger.debug(s"new postion: ${consumer.position(partition)}")
+      if(result.isEmpty) {
+        offset-=1
+      } else {
+        // We already consumed a record. Now go forward in the topic until we have consumed the last record. After
+        // consuming the last record the consumer offset should become equal to max_offset (assuming no one is writing
+        // to the topic while this function is running)
+        do {
+          height = Math.max(height, result.records(partition).asScala.map(_.key().toInt).max)
+          logger.debug(s"Found new max height: $height")
+          result = consumer.poll(1000)
+          logger.debug(s"new position: ${consumer.position(partition)}")
+          // We assume that no one is writing to the topic while the seek is happening
+        } while (consumer.position(partition) < max_offset)
+      }
+    }
+
+    height
+  }
 
   /**
    * Main function. Should be called from a cron job which runs once every 10 minutes
@@ -86,21 +98,12 @@ class BitcoinKafkaProducer
 
     sys.addShutdownHook {
       logger.error("Attempting graceful shutdown")
-      if(sinkCommitted) {
-        world.lastBlockStore.abort()
-      }
       world.closeEverythingQuietly()
     }
 
     try {
-      // Get last written block or 0 if none exist yet
-      if (world.lastBlockStore.read.isEmpty) {
-        //Since this operation is not a part of a transaction it will update both the write and commit store
-        world.lastBlockStore.create(0)
-      }
 
-      val lastWritten: Int = world.lastBlockStore.read
-        .map(_.intValue).get
+      val lastWritten = lastProcessedBlockHeight()
 
       logger.info(s"last_written_block=$lastWritten")
 
@@ -112,7 +115,7 @@ class BitcoinKafkaProducer
       var blocks = 0
       for (height <- (lastWritten + 1) to lastToBeWritten) {
         logger.debug(s"current_block=$height")
-        txProcess(height)
+        processBlock(height)
         blocks += 1
         var test = System.currentTimeMillis()
         if (test - startTs > 60000) {

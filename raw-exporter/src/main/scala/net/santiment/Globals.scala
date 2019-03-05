@@ -17,6 +17,7 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import collection.JavaConverters._
 import net.santiment.util.Store.IntSerde
 import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.common.TopicPartition
 
 /**
   * Configuration class with given default values. If you want to change some of those for testing, extend the class anc override the necessary settings
@@ -40,9 +41,6 @@ class Config {
   )
 
   lazy val kafkaTopic = "btc-raw-blocks"
-
-  lazy val zkLastWrittenPath = s"/$kafkaTopic/last-writen-block-height"
-  lazy val zkLastComittedPath = s"/$kafkaTopic/last-commited-block-height"
 
   lazy val confirmations: Int = sys.env.getOrElse("CONFIRMATIONS","3").toInt
 
@@ -78,11 +76,9 @@ class Globals extends LazyLogging
 
   lazy val migrator = new Migrator(migrations, nextMigrationStore, nextMigrationToCleanStore)
 
-  lazy val lastWrittenHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastWrittenPath)
-  lazy val lastCommittedHeightStore: Store[Int] = new ZookeeperStore[Int](zk, config.zkLastComittedPath)
-  lazy val lastBlockStore: TransactionalStore[Int] = new SimpleTxStore[Int](lastWrittenHeightStore, lastCommittedHeightStore)
-
   lazy val producer:KafkaProducer[String, Array[Byte]] = makeKafkaProducer(config.kafka)
+
+  lazy val consumer:KafkaConsumer[String, Array[Byte]] = makeKafkaConsumer(config.kafka)
   lazy val sink:TransactionalSink[Array[Byte]] = new KafkaByteArraySink(producer, config.kafkaTopic)
 
   lazy val bitcoindJsonRpcClient: JsonRpcHttpClient = makeBitcoindJsonRpcClient(config.bitcoind)
@@ -176,6 +172,26 @@ class Globals extends LazyLogging
     client
   }
 
+  def makeKafkaConsumer(config: KafkaConfig): KafkaConsumer[String, Array[Byte]] = {
+
+    val properties = new Properties()
+    properties.put("bootstrap.servers", config.bootstrapServers)
+    properties.put("group.id", "")
+    properties.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
+    properties.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer")
+
+    properties.setProperty("bootstrap.servers", config.bootstrapServers)
+
+    properties.put("enable.auto.commit", "false")
+    properties.put("auto.offset.reset", "earliest")
+    properties.put("isolation.level", "read_committed")
+
+    val client: KafkaConsumer[String, Array[Byte]] = new KafkaConsumer[String, Array[Byte]](properties)
+    logger.info(s"Consumer connected to Kafka at ${config.bootstrapServers}")
+    client
+  }
+
+
   def makeKafkaAdminClient(config:KafkaConfig):AdminClient = {
     val properties = new Properties()
     properties.put("bootstrap.servers", config.bootstrapServers)
@@ -186,11 +202,7 @@ class Globals extends LazyLogging
     * Attempt to close gracefully all connections
     */
   def closeEverythingQuietly(): Unit = {
-    try {
-      zk.close()
-    } finally {
       producer.close()
-    }
   }
 
 
